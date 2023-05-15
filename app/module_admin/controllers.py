@@ -13,7 +13,7 @@ from app import hashing
 
 # Import module models
 from app.module_admin.models import Admin
-from app.module_users.models import AchievementProgress, BannedEmails, FacebookAuth, Friend, FriendInvite, GoogleAuth, User, SocialOutAuth, UserLanguage
+from app.module_users.models import AchievementProgress, BannedEmails, FacebookAuth, Friend, FriendInvite, GoogleAuth, User, ViajuntosAuth, UserLanguage
 from app.module_users.utils import generate_tokens
 from app.utils.email import send_email
 from app.module_event.models import Event
@@ -33,10 +33,10 @@ def login():
         return jsonify({'error_message': 'Email or password are wrong.'}), 404
     if not Admin.exists(user.id):
         return jsonify({'error_message': 'Only administrators can access this resource.'}), 403
-    socialout_auth = SocialOutAuth.query.filter_by(id = user.id).first()
-    if socialout_auth == None:
+    viajuntos_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
+    if viajuntos_auth == None:
         return jsonify({'error_message': 'Authentication method not available for this email.'}), 400 
-    if not hashing.check_value(socialout_auth.pw, password, salt=socialout_auth.salt):
+    if not hashing.check_value(viajuntos_auth.pw, password, salt=viajuntos_auth.salt):
         return jsonify({'error_message': 'Email or password are wrong.'}), 400 
     return generate_tokens(str(user.id)), 200
 
@@ -128,20 +128,20 @@ def ban():
             for participant in event.participants_in_event:
                 participant_user = User.query.filter_by(id = participant.user_id).first()
                 if participant_user.id != banned_user.id:
-                    send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe SocialOut team.')
+                    send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
         msg, status = delete_event(str(event.id))
         if status != 202:
             return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
     
     # Notificar baneo a usuario
-    email_body = 'Due to an accumulation of bad reviews that have been determined to be sufficient to take action we feel obligated to ban you from the SocialOut platform.\n'
+    email_body = 'Due to an accumulation of bad reviews that have been determined to be sufficient to take action we feel obligated to ban you from the Viajuntos platform.\n'
     if ban_reason != None:
         email_body += f'\nFurther explanation follows:\n{ban_reason}\n'
-    email_body += f'\nIf you feel like this decision is unjustified contact us directly. Your account will be terminated permanently but your email can be removed from our blacklist in the future.\n\nThe SocialOut team.'
-    send_email(banned_user.email, 'You have been banned from SocialOut', email_body)
+    email_body += f'\nIf you feel like this decision is unjustified contact us directly. Your account will be terminated permanently but your email can be removed from our blacklist in the future.\n\nThe Viajuntos team.'
+    send_email(banned_user.email, 'You have been banned from Viajuntos', email_body)
 
     # Eliminar métodos de autenticación del usuario baneado
-    so_auth = SocialOutAuth.query.filter_by(id = banned_user.id).first()
+    so_auth = ViajuntosAuth.query.filter_by(id = banned_user.id).first()
     if so_auth != None:
         so_auth.delete()
     g_auth = GoogleAuth.query.filter_by(id = banned_user.id).first()
@@ -205,12 +205,12 @@ def unban():
     ban_reason = ban.reason
     ban.delete()
 
-    email_body = 'Hey there! Welcome back to SocialOut.\n\nYou have been unbaned by one of our staff members, \
+    email_body = 'Hey there! Welcome back to Viajuntos.\n\nYou have been unbaned by one of our staff members, \
         please behave properly this time and do not repeat your past mistakes.\n\n'
     if ban_reason != None:
         email_body += f'We remind you the reason you were banned for: {ban_reason}\n\n'
     if reason != None:
         email_body += f'This is the reason for your unban: {reason}\n\n'
-    email_body += 'See you around!\nThe SocialOut team.'
-    send_email(email, 'Unban from SocialOut notice.', email_body)
+    email_body += 'See you around!\nThe Viajuntos team.'
+    send_email(email, 'Unban from Viajuntos notice.', email_body)
     return jsonify({'message': 'Email unbaned'}), 200

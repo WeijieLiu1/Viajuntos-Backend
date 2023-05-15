@@ -1,0 +1,14 @@
+export AIRSERVICE_JOBS_SECRET_KEY="mykey" 
+export API_DEBUG="True"
+export API_DOMAIN_NAME="http://localhost"  
+export API_PORT=5000
+export API_SECRET_KEY="myapisecretkey"
+export DATABASE_URL="localhost"  
+export JWT_SECRET_KEY="myjwtkey"
+export MAIL_PASSWORD="kdbbzkbkpemzfsrd"  
+export MAIL_USERNAME="zjqtlwj@gmail.com"
+export POSTGRES_DB="mydatabase" 
+export POSTGRES_PASSWORD="mypassword"
+export POSTGRES_PORT=5432
+export POSTGRES_USER="postgre"
+#echo $POSTGRES_PASSWORD

@@ -18,7 +18,7 @@ from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
 
 # Import module models
-from app.module_users.models import User, SocialOutAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
+from app.module_users.models import User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
 
 # Define the blueprint: 'users', set its url prefix: app.url/users
 module_users_v1 = Blueprint('users', __name__, url_prefix='/v1/users')
@@ -134,26 +134,26 @@ def change_password(id):
     auth_id = get_jwt_identity()
     if id != auth_id:
         return jsonify({'error_message': 'Only the owner of the account can change its password'}), 403
-    socialout_auth = SocialOutAuth.query.filter_by(id = uuid.UUID(id)).first()
-    if socialout_auth == None:
-        return jsonify({'error_message': 'Socialout authentication method not available for this user, can not change password'}), 400 
-    if not hashing.check_value(socialout_auth.pw, old_pw, salt=socialout_auth.salt):
+    viajuntos_auth = ViajuntosAuth.query.filter_by(id = uuid.UUID(id)).first()
+    if viajuntos_auth == None:
+        return jsonify({'error_message': 'Viajuntos authentication method not available for this user, can not change password'}), 400 
+    if not hashing.check_value(viajuntos_auth.pw, old_pw, salt=viajuntos_auth.salt):
         return jsonify({'error_message': 'Wrong old password'}), 400
 
-    debug = f'{socialout_auth.salt} - {socialout_auth.pw}'
+    debug = f'{viajuntos_auth.salt} - {viajuntos_auth.pw}'
 
-    # Add socialout auth method to user
+    # Add viajuntos auth method to user
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(new_pw, salt=user_salt)
-    socialout_auth.salt = user_salt
-    socialout_auth.pw = hashed_pw
+    viajuntos_auth.salt = user_salt
+    viajuntos_auth.pw = hashed_pw
     try:
         db.session.commit()
     except:
         return jsonify({'error_message': f'Something went wrong when changing password for user {id}, {user_salt}, {new_pw}, {hashed_pw} .... {debug}'}), 500
 
     user = User.query.filter_by(id = uuid.UUID(id)).first()
-    send_email(user.email, 'SocialOut password change notice!', f'Your password was recently changed, if it was not you, please log into your {user.username} account by clicking on "Forgot password" in the login screen.')
+    send_email(user.email, 'Viajuntos password change notice!', f'Your password was recently changed, if it was not you, please log into your {user.username} account by clicking on "Forgot password" in the login screen.')
     return generate_tokens(str(user.id)), 200
 
 ############################################ REGISTER #############################################
@@ -161,19 +161,19 @@ def change_password(id):
 @module_users_v1.route('/register/check', methods=['GET'])
 def check_register_status():
     if 'type' not in request.args:
-        return jsonify({'error_message': 'Must indicate type of authentication to check {socialout, google, facebook}'}), 400
+        return jsonify({'error_message': 'Must indicate type of authentication to check {viajuntos, google, facebook}'}), 400
     type = request.args['type']
-    if type == 'socialout':
-        return check_register_status_socialout(request.args)
+    if type == 'viajuntos':
+        return check_register_status_viajuntos(request.args)
     if type == 'google':
         return check_register_status_google(request.args)
     if type == 'facebook':
         return check_register_status_facebook(request.args)
-    return jsonify({'error_message': 'Type of authentication must be one of {socialout, google, facebook}'}), 400
+    return jsonify({'error_message': 'Type of authentication must be one of {viajuntos, google, facebook}'}), 400
 
-def check_register_status_socialout(args):
+def check_register_status_viajuntos(args):
     if 'email' not in args:
-        return jsonify({'error_message': 'Socialout auth method must indicate an email'}), 400
+        return jsonify({'error_message': 'Viajuntos auth method must indicate an email'}), 400
     email = args['email']
     if BannedEmails.exists(email):
         return jsonify({'error_message': 'This email is banned'}), 409
@@ -181,9 +181,9 @@ def check_register_status_socialout(args):
     if user_id == None:
         send_verification_code_to(email)
         return jsonify({'action': 'continue'}), 200
-    # check if it is socialout
+    # check if it is viajuntos
     auth_methods = authentication_methods_for_user_id(user_id)
-    if 'socialout' in auth_methods:
+    if 'viajuntos' in auth_methods:
         return jsonify({'action': 'error', 'error_message': 'User with this email already exists'}), 200
     send_verification_code_to(email)
     return jsonify({'action': 'link_auth', 'alternative_auths': auth_methods}), 200
@@ -232,8 +232,8 @@ def check_register_status_facebook(args):
     return jsonify({'action': 'link_auth', 'alternative_auths': auth_methods}), 200
 
 
-@module_users_v1.route('/register/socialout', methods=['POST'])
-def register_socialout():
+@module_users_v1.route('/register/viajuntos', methods=['POST'])
+def register_viajuntos():
     if 'email' not in request.json:
         return jsonify({'error_message': 'Email attribute missing in json'}), 400 
     if 'password' not in request.json:
@@ -296,10 +296,10 @@ def register_socialout():
         except:
             return jsonify({'error_message': f'An error occured when adding language {l} to new user.'}), 500
     
-    # Add socialout auth method to user
+    # Add viajuntos auth method to user
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(pw, salt=user_salt)
-    socialout_auth = SocialOutAuth(user_id, user_salt, hashed_pw)
+    viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
 
     # Increment achievement
     if len(description) > 120:
@@ -307,9 +307,9 @@ def register_socialout():
     increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
-        socialout_auth.save()
+        viajuntos_auth.save()
     except:
-        return jsonify({'error_message': 'Something went wrong when adding auth method socialout to user.'}), 500
+        return jsonify({'error_message': 'Something went wrong when adding auth method viajuntos to user.'}), 500
 
     # Remove verification code -> already used
     db_verification.delete()
@@ -461,27 +461,27 @@ def register_facebook():
 @module_users_v1.route('/login/check', methods=['GET'])
 def check_login_status():
     if 'type' not in request.args:
-        return jsonify({'error_message': 'Must indicate type of authentication to check {socialout, google, facebook}'}), 400
+        return jsonify({'error_message': 'Must indicate type of authentication to check {viajuntos, google, facebook}'}), 400
     type = request.args['type']
-    if type == 'socialout':
-        return check_login_status_socialout(request.args)
+    if type == 'viajuntos':
+        return check_login_status_viajuntos(request.args)
     if type == 'google':
         return check_login_status_google(request.args)
     if type == 'facebook':
         return check_login_status_facebook(request.args)
 
-    return jsonify({'error_message': 'Type of authentication must be one of {socialout, google, facebook}'}), 400
+    return jsonify({'error_message': 'Type of authentication must be one of {viajuntos, google, facebook}'}), 400
 
-def check_login_status_socialout(args):
+def check_login_status_viajuntos(args):
     if 'email' not in args:
-        return jsonify({'error_message': 'Socialout auth method must indicate an email'}), 400
+        return jsonify({'error_message': 'Viajuntos auth method must indicate an email'}), 400
     email = args['email']
     user_id = user_id_for_email(email)
     if user_id == None:
         return jsonify({'action': 'error', 'error_message': 'Account does not exist'}), 200
-    # check if it is socialout
+    # check if it is viajuntos
     auth_methods = authentication_methods_for_user_id(user_id)
-    if 'socialout' in auth_methods:
+    if 'viajuntos' in auth_methods:
         return jsonify({'action': 'continue'}), 200
     send_verification_code_to(email)
     return jsonify({'action': 'link_auth', 'alternative_auths': auth_methods}), 200
@@ -525,8 +525,8 @@ def check_login_status_facebook(args):
         return jsonify({'action': 'continue'}), 200
     return jsonify({'action': 'link_auth', 'alternative_auths': auth_methods}), 200
 
-@module_users_v1.route('/login/socialout', methods=['POST'])
-def login_socialout():
+@module_users_v1.route('/login/viajuntos', methods=['POST'])
+def login_viajuntos():
     if not ('email' in  request.json and 'password' in request.json):
         return jsonify({'error_message': 'Missing credentials in json body.'}), 400 
     email = request.json['email']
@@ -534,10 +534,10 @@ def login_socialout():
     user = User.query.filter_by(email = email).first()
     if user == None:
         return jsonify({'error_message': 'Email or password are wrong.'}), 400 
-    socialout_auth = SocialOutAuth.query.filter_by(id = user.id).first()
-    if socialout_auth == None:
+    viajuntos_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
+    if viajuntos_auth == None:
         return jsonify({'error_message': 'Authentication method not available for this email'}), 400 
-    if not hashing.check_value(socialout_auth.pw, password, salt=socialout_auth.salt):
+    if not hashing.check_value(viajuntos_auth.pw, password, salt=viajuntos_auth.salt):
         return jsonify({'error_message': 'Email or password are wrong.'}), 400 
     return generate_tokens(str(user.id)), 200
 
@@ -603,20 +603,20 @@ def refresh():
 @module_users_v1.route('/auth_method', methods=['POST'])
 def link_auth_method():
     if 'type' not in request.json:
-        return jsonify({'error_message': 'Must indicate type of authentication to link {socialout, google, facebook}'}), 400
+        return jsonify({'error_message': 'Must indicate type of authentication to link {viajuntos, google, facebook}'}), 400
     if 'credentials' not in request.json:
         return jsonify({'error_message': 'Missing attribute credentials in json body'}), 400
     type = request.json['type']
-    if type == 'socialout':
-        return link_socialout_auth_method(request.json['credentials'])
+    if type == 'viajuntos':
+        return link_viajuntos_auth_method(request.json['credentials'])
     if type == 'google':
         return link_google_auth_method(request.json['credentials'])
     if type == 'facebook':
         return link_facebook_auth_method(request.json['credentials'])
 
-def link_socialout_auth_method(args):
+def link_viajuntos_auth_method(args):
     if not ('email' in args and 'password' in args and 'verification' in args):
-        return jsonify({'error_message': 'Socialout auth method must indicate email, password and verification in credentials'}), 400
+        return jsonify({'error_message': 'Viajuntos auth method must indicate email, password and verification in credentials'}), 400
     email = args['email']
     password = args['password']
     verification = args['verification']
@@ -636,18 +636,18 @@ def link_socialout_auth_method(args):
     if db_verification.code != verification:
         return jsonify({'error_message': 'Verification code does not coincide with code sent to email'}), 400
     
-    # Add socialout auth method to user
+    # Add viajuntos auth method to user
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(password, salt=user_salt)
-    socialout_auth = SocialOutAuth(user_id, user_salt, hashed_pw)
+    viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
 
     # Increment achievement
     increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
-        socialout_auth.save()
+        viajuntos_auth.save()
     except:
-        return jsonify({'error_message': 'Something went wrong when adding auth method socialout to user'}), 500
+        return jsonify({'error_message': 'Something went wrong when adding auth method viajuntos to user'}), 500
 
     # Remove verification code -> already used
     db_verification.delete()

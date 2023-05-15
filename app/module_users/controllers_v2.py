@@ -12,7 +12,7 @@ from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
 
 # Import module models
-from app.module_users.models import FriendInvite, User, Achievement, AchievementProgress, Friend, UserLanguage, EmailVerificationPendant, SocialOutAuth
+from app.module_users.models import FriendInvite, User, Achievement, AchievementProgress, Friend, UserLanguage, EmailVerificationPendant, ViajuntosAuth
 
 # Import the hashing object from the main app module
 from app import hashing
@@ -63,7 +63,7 @@ def send_password_reset_code():
         return jsonify({'action': 'error', 'error_message': 'No user found for this email'}), 404
 
     auth_methods = authentication_methods_for_user_id(user_id)
-    if 'socialout' not in auth_methods:
+    if 'viajuntos' not in auth_methods:
         return jsonify({'action': 'no_auth', 'alternative_auths': auth_methods}), 202
         
     code = get_random_salt(6)
@@ -76,7 +76,7 @@ def send_password_reset_code():
         db_verification.code = code
         db_verification.expires_at = datetime.now(timezone.utc)+timedelta(minutes=15)
         db.session.commit()
-    send_email(email, 'SocialOut: Reset your password with this code.', f'Your verification code for SocialOut password reset is {code}. It expires in 15 minutes.')
+    send_email(email, 'Viajuntos: Reset your password with this code.', f'Your verification code for Viajuntos password reset is {code}. It expires in 15 minutes.')
 
     return jsonify({'action': 'continue'}), 200
 
@@ -110,17 +110,17 @@ def reset_forgotten_password():
     if db_verification.code != verification:
         return jsonify({'error_message': 'Verification code does not coincide with code sent to email'}), 403
     
-    socialout_auth = SocialOutAuth.query.filter(SocialOutAuth.id == user_id).first()
+    viajuntos_auth = ViajuntosAuth.query.filter(ViajuntosAuth.id == user_id).first()
 
-    # Update socialout auth method to user
+    # Update viajuntos auth method to user
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(pw, salt=user_salt)
-    socialout_auth.salt = user_salt
-    socialout_auth.pw = hashed_pw
+    viajuntos_auth.salt = user_salt
+    viajuntos_auth.pw = hashed_pw
     try:
-        socialout_auth.save()
+        viajuntos_auth.save()
     except:
-        return jsonify({'error_message': 'Something went wrong when adding auth method socialout to user.'}), 500
+        return jsonify({'error_message': 'Something went wrong when adding auth method viajuntos to user.'}), 500
 
     # Remove verification code -> already used
     db_verification.delete()

@@ -85,7 +85,7 @@ def upgrade():
     sa.ForeignKeyConstraint(['id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('social_out_auth',
+    op.create_table('vajuntos_auth',
     sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('salt', sa.String(), nullable=False),
     sa.Column('pw', sa.String(), nullable=False),
@@ -126,7 +126,7 @@ def downgrade():
     op.drop_table('participant')
     op.drop_table('likes')
     op.drop_table('user_lang')
-    op.drop_table('social_out_auth')
+    op.drop_table('vajuntos_auth')
     op.drop_table('google_auth')
     op.drop_table('friends')
     op.drop_table('friend_invites')

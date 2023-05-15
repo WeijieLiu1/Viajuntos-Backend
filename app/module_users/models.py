@@ -49,8 +49,8 @@ class User(db.Model):
             'hobbies': self.hobbies
         }
 
-class SocialOutAuth(db.Model):
-    __tablename__ = 'social_out_auth'
+class ViajuntosAuth(db.Model):
+    __tablename__ = 'vajuntos_auth'
 
     # User id
     id = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
@@ -59,7 +59,7 @@ class SocialOutAuth(db.Model):
     # Hashed and salted password
     pw = db.Column(db.String, nullable=False)
 
-    # To CREATE an instance of a SocialOutUser
+    # To CREATE an instance of a ViajuntosUser
     def __init__(self, id, salt, pw):
         self.id = id
         self.salt = salt

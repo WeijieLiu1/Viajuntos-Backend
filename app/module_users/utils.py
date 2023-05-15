@@ -1,7 +1,7 @@
 from flask import jsonify
 from flask_jwt_extended import create_access_token, create_refresh_token
 # Import module models
-from app.module_users.models import User, SocialOutAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Achievement, AchievementProgress
+from app.module_users.models import User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Achievement, AchievementProgress
 from app.utils.email import send_email
 import string
 import random
@@ -16,9 +16,9 @@ def user_id_for_email(email):
 
 def authentication_methods_for_user_id(id):
     result = []
-    socialout_auth = SocialOutAuth.query.filter_by(id = id).first()
-    if socialout_auth != None:
-        result.append('socialout')
+    viajuntos_auth = ViajuntosAuth.query.filter_by(id = id).first()
+    if viajuntos_auth != None:
+        result.append('viajuntos')
     google_auth = GoogleAuth.query.filter_by(id = id).first()
     if google_auth != None:
         result.append('google')
@@ -38,7 +38,7 @@ def send_verification_code_to(email):
         db_verification.code = code
         db_verification.expires_at = datetime.now(timezone.utc)+timedelta(minutes=15)
         db.session.commit()
-    successful_email = send_email(email, 'SocialOut auth verification code', f'Your verification code for SocialOut authentication is {code}. It expires in 15 minutes.')
+    successful_email = send_email(email, 'Viajuntos auth verification code', f'Your verification code for Viajuntos authentication is {code}. It expires in 15 minutes.')
     if not successful_email:
         db_verification.delete()
 

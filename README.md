@@ -34,10 +34,10 @@ Si hay que instalar librerías de python para ejecutar tests o pruebas en local,
 $: python3 -m venv env
 
 -- Activa el entorno virtual de trabajo
-$: source env/bin/activate
+$: source env/bin/activate      (windows: env\Scripts\activate)
 
 -- Upgrade de pip y wheel e instalar dependencias del proyecto
-$: pip install -U pip wheel
+$: pip install -U pip wheel     (windows: .\env\Scripts\python.exe -m pip install -U pip wheel)
 $: pip install -r requirements.txt
 
 -- Instalar nuevas dependencias
@@ -126,9 +126,9 @@ $: docker-compose up --build db
 
 La base de datos PostgreSQL deberia estar corriendo!
 Puedes conectarte a través de un cliente como por ejemplo DBeaver con las credenciales:
-- username: socialout
+- username: viajuntos
 - password: password1
-- database: socialout
+- database: viajuntos
 - port: 5432
 
 En todo caso, para poner al dia la bd con la versión más reciente entra en el virtual environment de python (créalo como se indica más arriba si no lo has hecho aún) y ejecuta:
@@ -176,7 +176,7 @@ Una vez esté corriendo deberias poder entrar a localhost:5000 en tu navegador y
 Per a fer deployment (only Cesc):
 
 ```
-heroku git:remote -a socialout-develop
+heroku git:remote -a viajuntos-develop
 ```
 
 Fer commit amb els fitxers. **IMPORTANT: NO PODEN HABER DOCKERFILES AL PROJECTE**

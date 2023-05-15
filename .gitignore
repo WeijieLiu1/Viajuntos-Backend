@@ -2,10 +2,10 @@
 env/
 __pycache__/
 /.pytest_cache
-testEnv.sh
-testEnvWin.ps1
+#testEnv.sh
+#testEnvWin.ps1
 .env
 app/module_airservice/triangulation.pkl
-docker-compose.yml
-Dockerfile
+#docker-compose.yml
+#Dockerfile
 /venv
