@@ -54,6 +54,7 @@ def get_profile(id):
 
 @module_users_v2.route('/forgot_pw', methods=['GET'])
 def send_password_reset_code():
+    return jsonify({'action': 'def send_password_reset_code():'}), 200
     if not (request.args and 'email' in request.args):
         return jsonify({'error_message': 'Must indicate an email'}), 400
     email = request.args['email']
