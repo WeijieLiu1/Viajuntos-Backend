@@ -746,6 +746,7 @@ def link_facebook_auth_method(args):
 @module_users_v1.route('/<id>/delete', methods=['DELETE'])
 @jwt_required(optional=False)
 def delete_account(id):
+    #return jsonify({'message': 'You have successfully deleted your viajuntos account.'}), 201
     try:
         user_id = uuid.UUID(id)
     except:
@@ -770,18 +771,20 @@ def delete_account(id):
 
     # Buscar los eventos creados por user
     all_events = Event.query.filter_by(user_creator = user.id).all()
-    for event in all_events:
-        # Si el evento era futuro, notificar participantes de que el evento es cancelado.
-        if current_time < event.date_started:
-            event_date_str = event.date_started.strftime('%Y-%m-%d')
-            for participant in event.participants_in_event:
-                participant_user = User.query.filter_by(id = participant.user_id).first()
-                if participant_user.id != user.id:
-                    send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
-        msg, status = event(str(event.id))
-        if status != 202:
-            return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
-    
+    if all_events != None:
+        for event in all_events:
+            # Si el evento era futuro, notificar participantes de que el evento es cancelado.
+            if current_time < event.date_started:
+                event_date_str = event.date_started.strftime('%Y-%m-%d')
+                for participant in event.participants_in_event:
+                    participant_user = User.query.filter_by(id = participant.user_id).first()
+                    if participant_user.id != user.id:
+                        send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
+            # msg, status = event(str(event.id))
+            if status != 202:
+                return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
+            event.delete()
+
     # Notificar baneo a usuario
     email_body = f'Dear {user.username}, You have successfully deleted your viajuntos account.'
     send_email(user.email, 'You have been banned from Viajuntos', email_body)
