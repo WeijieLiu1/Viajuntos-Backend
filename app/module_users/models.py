@@ -18,17 +18,20 @@ class User(db.Model):
     description = db.Column(db.String, default="", nullable=False)
     # User hobbies
     hobbies = db.Column(db.String, default="", nullable=False)
+    # User premuim
+    isPremuim = db.Column(db.bool, default=False, nullable=False)
 
     # To CREATE an instance of a User
-    def __init__(self, id, username, email, description, hobbies):
+    def __init__(self, id, username, email, description, hobbies, isPremuim):
         self.id = id
         self.username = username
         self.email = email
         self.description = description
         self.hobbies = hobbies
+        self.isPremuim = isPremuim
 
     def __repr__(self):
-        return f'User({self.id}, {self.username}, {self.description}, {self.hobbies})'
+        return f'User({self.id}, {self.username}, {self.description}, {self.hobbies}, {self.isPremuim})'
 
     # To DELETE a row from the table
     def delete(self):
@@ -46,7 +49,8 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'description': self.description,
-            'hobbies': self.hobbies
+            'hobbies': self.hobbies,
+            'isPremuim': self.isPremuim
         }
 
 class ViajuntosAuth(db.Model):
@@ -238,6 +242,30 @@ class AchievementProgress(db.Model):
         db.session.add(self)
         db.session.commit()
 
+class premium_expiration(db.Model):
+    __tablename__ = 'premium_expiration'
+
+    # User id
+    user = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
+    # Fecha de vencimiento
+    expiration_at  = db.Column(db.DateTime)
+
+    def __init__(self, user, expiration_at):
+        self.user = user
+        self.expiration_at = expiration_at
+
+    def __repr__(self):
+        return f'Achievement({self.id}, {self.expiration_at})'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+    
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
 
 class Friend(db.Model):
     __tablename__ = 'friends'

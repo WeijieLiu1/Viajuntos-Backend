@@ -7,8 +7,10 @@ export DATABASE_URL="localhost"
 export JWT_SECRET_KEY="myjwtkey"
 export MAIL_PASSWORD="kdbbzkbkpemzfsrd"  
 export MAIL_USERNAME="zjqtlwj@gmail.com"
-export POSTGRES_DB="mydatabase" 
-export POSTGRES_PASSWORD="mypassword"
+export POSTGRES_DB="viajuntosdb" 
+export POSTGRES_PASSWORD="password123"
 export POSTGRES_PORT=5432
-export POSTGRES_USER="postgre"
+export POSTGRES_USER="viajuntos"
+export SQLALCHEMY_DATABASE_URI="postgresql://viajuntos:password123@localhost:5432/viajuntosdb"
+export DATABASE_URL="postgresql://viajuntos:password123@localhost:5432/viajuntosdb"
 #echo $POSTGRES_PASSWORD

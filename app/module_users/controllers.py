@@ -1,5 +1,7 @@
 # Import flask dependencies
 from flask import Blueprint, jsonify, request
+from app.module_chat.controllers import borrar_mensajes_usuario
+from app.module_event.models import Event
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
 from datetime import datetime, timedelta, timezone
 #from google.oauth2 import id_token
@@ -18,7 +20,7 @@ from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
 
 # Import module models
-from app.module_users.models import User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
+from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
 
 # Define the blueprint: 'users', set its url prefix: app.url/users
 module_users_v1 = Blueprint('users', __name__, url_prefix='/v1/users')
@@ -114,6 +116,16 @@ def update_profile(id):
     profile['languages'] = [ str(l.language.value) for l in user_languages ]
 
     return jsonify(profile), 200
+
+@module_users_v1.route('/<id>', methods=['PUT'])
+@jwt_required(optional=False)
+def purchase_premium(id):
+    auth_id = get_jwt_identity()
+    if id != auth_id:
+        return jsonify({'error_message': 'Only the owner of the profile can update it'}), 403
+    
+    
+    return jsonify({'message': 'Premuim purchase succeeded'}), 200
 
 @module_users_v1.route('/<id>/pw', methods=['POST'])
 @jwt_required(optional=False)
@@ -256,23 +268,27 @@ def register_viajuntos():
     languages = request.json['languages']
     hobbies = request.json['hobbies']
     verification = request.json['verification']
-    
+    print("verification0: "+verification)
     if len(languages) == 0 or any([l not in ['catalan', 'spanish', 'english'] for l in languages]):
+        
         return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
 
     if BannedEmails.exists(email):
         return jsonify({'error_message': 'This email is banned'}), 409
-
+    print("verification1: "+verification)
     # Check no other user exists with that email
     if user_id_for_email(email) != None:
+        print("verification1.5: "+verification)
         return jsonify({'error_message': 'User with this email already exists'}), 400
-
+    print("verification2: "+verification)
     # Check password strength
     pw_msg, pw_status = verify_password_strength(pw)
     if pw_status != 200: return pw_msg, pw_status
-
+    print("verification3: "+verification)
     # Check verification code in codes sent to email
+    print("email: "+email)
     db_verification = EmailVerificationPendant.query.filter(EmailVerificationPendant.email == email).filter(EmailVerificationPendant.expires_at > datetime.now(timezone.utc)).first()
+    print("verification4: "+db_verification.code)
     if db_verification == None:
         return jsonify({'error_message': 'Verification code was never sent to this email or the code has expired.'}), 400
     if db_verification.code != verification:
@@ -280,7 +296,7 @@ def register_viajuntos():
     
     if (len(description) > 180):
         return jsonify({'error_message': f'Description is too long. No more than 180 characters allowed.'}), 400
-
+    print("verification11: "+verification)
     # Add user to bd
     user_id = uuid.uuid4()
     user = User(user_id, username, email, description, hobbies)
@@ -288,7 +304,7 @@ def register_viajuntos():
         user.save()
     except:
         return jsonify({'error_message': 'Something went wrong when creating new user in db.'}), 500
-    
+    print("verification12: "+verification)
     # Add languages to user
     for l in languages:
         try:
@@ -300,20 +316,22 @@ def register_viajuntos():
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(pw, salt=user_salt)
     viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
-
+    print("verification10: "+verification)
     # Increment achievement
-    if len(description) > 120:
-        increment_achievement_of_user('storyteller', user_id)
-    increment_achievement_of_user('credential_multiverse', user_id)
-
+    #todo
+    # if len(description) > 120:
+    #     increment_achievement_of_user('storyteller', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
+    print("verification21: "+verification)
     try:
         viajuntos_auth.save()
     except:
         return jsonify({'error_message': 'Something went wrong when adding auth method viajuntos to user.'}), 500
 
     # Remove verification code -> already used
+    print("verification22: "+verification)
     db_verification.delete()
-    
+    print("verification30: "+verification)
     return generate_tokens(str(user_id)), 200
 
 @module_users_v1.route('/register/google', methods=['POST'])
@@ -723,3 +741,84 @@ def link_facebook_auth_method(args):
     
     return generate_tokens(str(user_id)), 200
 
+########################################## DELETE ACCOUNT ########################################
+
+@module_users_v1.route('/<id>/delete', methods=['DELETE'])
+@jwt_required(optional=False)
+def delete_account(id):
+    try:
+        user_id = uuid.UUID(id)
+    except:
+        return jsonify({"error_message": "User_id isn't a valid UUID"}), 400
+    
+    try:
+        user = User.query.get(user_id)
+    except:
+        return jsonify({"error_message": f"Error getting the event"}), 400
+
+    if user is None:
+        return jsonify({"error_message": f"The event {user_id} doesn't exist"}), 400
+
+    # restricion: El usuario solo puede eliminar su cuenta propia (mirando Bearer Token)
+    auth_id = get_jwt_identity()
+    if id != auth_id:
+        return jsonify({'error_message': 'Users can only delete their own account. '}), 403
+    current_time = datetime.now()
+    msg, status = borrar_mensajes_usuario(user_id)
+    if status != 202:
+        return jsonify({'error_message': 'Chats cannot be successfully deleted.', 'details': msg['error_message']}), 500
+
+    # Buscar los eventos creados por user
+    all_events = Event.query.filter_by(user_creator = user.id).all()
+    for event in all_events:
+        # Si el evento era futuro, notificar participantes de que el evento es cancelado.
+        if current_time < event.date_started:
+            event_date_str = event.date_started.strftime('%Y-%m-%d')
+            for participant in event.participants_in_event:
+                participant_user = User.query.filter_by(id = participant.user_id).first()
+                if participant_user.id != user.id:
+                    send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
+        msg, status = event(str(event.id))
+        if status != 202:
+            return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
+    
+    # Notificar baneo a usuario
+    email_body = f'Dear {user.username}, You have successfully deleted your viajuntos account.'
+    send_email(user.email, 'You have been banned from Viajuntos', email_body)
+
+    # Eliminar métodos de autenticación del usuario baneado
+    so_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
+    if so_auth != None:
+        so_auth.delete()
+    g_auth = GoogleAuth.query.filter_by(id = user.id).first()
+    if g_auth != None:
+        g_auth.delete()
+    f_auth = FacebookAuth.query.filter_by(id = user.id).first()
+    if f_auth != None:
+        f_auth.delete()
+# Eliminar logros del usuario baneado
+    ach = AchievementProgress.query.filter_by(user = user.id).all()
+    for a in ach:
+        a.delete()
+    
+    # Eliminar amistades del usuario baneado
+    friends = Friend.query.filter_by(invitee = user.id).all()
+    friends.extend(Friend.query.filter_by(invited = user.id).all())
+    for f in friends:
+        f.delete()
+    invites = FriendInvite.query.filter_by(invitee = user.id).all()
+    for i in invites:
+        i.delete()
+    
+    # Eliminar relación idiomas de usuario
+    lang = UserLanguage.query.filter_by(user = user.id).all()
+    for l in lang:
+        l.delete()
+    
+    # Eliminar usuario
+    try:
+        user.delete()
+    except Exception as e:
+        return jsonify({'error_message': 'Error while deleting user instance', 'details': e}), 500
+    
+    return jsonify({'message': 'You have successfully deleted your viajuntos account.'}), 201

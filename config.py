@@ -10,12 +10,11 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Define the database we are working with 
 #SQLALCHEMY_DATABASE_URI = (os.getenv('DATABASE_URL') if os.getenv('DATABASE_URL') is not None else '').replace('postgres://', 'postgresql://')
-SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI', 'localhost')  
+SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI', 'postgresql://postgre:password123@localhost:5432/viajuntosdb')  
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 DATABASE_CONNECT_OPTIONS = {}
 
 MIGRATIONS_SQLALCHEMY_DATABASE_URI = (os.getenv('DATABASE_URL') if os.getenv('DATABASE_URL') is not None else '').replace('postgres://', 'postgresql://')
-
 # Application threads. A common general assumption is
 # using 2 per available processor cores - to handle
 # incoming requests using one and performing background

@@ -467,6 +467,7 @@ def get_creations():
     
     try:
         events_creats = Event.query.filter_by(user_creator = user_id)
+        print("try to get created")
         return jsonify([event.toJSON() for event in events_creats]), 200
     except:
         return jsonify({"error_message": "An unexpected error ocurred"}), 400        

@@ -31,7 +31,7 @@ En un directorio de módulo habrá básicamente dos ficheros:
 Si hay que instalar librerías de python para ejecutar tests o pruebas en local, ejecutar des del directorio base de proyecto:
 
 ```
-$: python3 -m venv env
+$: python -m venv env
 
 -- Activa el entorno virtual de trabajo
 $: source env/bin/activate      (windows: env\Scripts\activate)
@@ -57,10 +57,10 @@ $: deactivate
 Primero instala los requirements.txt como se explica arriba.
 ```
 -- Ejecuta con el entorno activo:
-$: python3 wsgi.py
+$: python wsgi.py
 
 -- o bien, ejecuta sin el entorno activo:
-$: env/bin/python3 wsgi.py
+$: env/bin/python wsgi.py
 ```
 
 ## EJECUTAR LA API EN ENTORNO AISLADO
@@ -127,18 +127,19 @@ $: docker-compose up --build db
 La base de datos PostgreSQL deberia estar corriendo!
 Puedes conectarte a través de un cliente como por ejemplo DBeaver con las credenciales:
 - username: viajuntos
-- password: password1
-- database: viajuntos
+- password: password123
+- database: viajuntosdb
 - port: 5432
 
 En todo caso, para poner al dia la bd con la versión más reciente entra en el virtual environment de python (créalo como se indica más arriba si no lo has hecho aún) y ejecuta:
 ```
-$: python3 manage.py db migrate
+$: python manage.py db init
+$: python manage.py db migrate
 ```
 Esto crea las versiones de migraciones (solo tiene efecto si has cambiado algo en los models.py de los módulos que están activamente en uso en la API).
 Para trasladar estas actualizaciones a la bd:
 ```
-$: python3 manage.py db upgrade
+$: python manage.py db upgrade
 ```
 Mira con el DBeaver si se han creado las tablas que esperabas en tu PotsgreSQL.
 

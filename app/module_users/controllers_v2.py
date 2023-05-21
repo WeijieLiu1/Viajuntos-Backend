@@ -54,7 +54,6 @@ def get_profile(id):
 
 @module_users_v2.route('/forgot_pw', methods=['GET'])
 def send_password_reset_code():
-    return jsonify({'action': 'def send_password_reset_code():'}), 200
     if not (request.args and 'email' in request.args):
         return jsonify({'error_message': 'Must indicate an email'}), 400
     email = request.args['email']
@@ -171,7 +170,7 @@ def accept_friend_link():
     friendship = Friend(invitation.invitee, auth_id)
     friendship.save()
 
-    # Increment achievement
+    # Increment achievement when add new friend
     increment_achievement_of_user('ambassador', invitation.invitee)
 
     invitation.delete()
