@@ -5,6 +5,7 @@ COPY ./requirements.txt /tmp/requirements.txt
 
 # Actualizar pip y instalar dependencias
 # RUN pip install -U setuptools
+RUN pip install -U pip wheel
 RUN pip install -U pip wheel setuptools
 # RUN pip install --upgrade setuptools
 # RUN pip3 install --upgrade pip
@@ -30,7 +31,7 @@ ENV MAIL_USERNAME="zjqtlwj@gmail.com"
 ENV POSTGRES_DB="viajuntosdb"  
 ENV POSTGRES_PASSWORD="password123"
 ENV POSTGRES_PORT=5432
-ENV POSTGRES_USER="postgre" 
+ENV POSTGRES_USER="viajuntos" 
 ENV SQLALCHEMY_DATABASE_URI = "postgresql://postgre:password123@localhost:5432/viajuntosdb"
 # Copiar el código de nuestra app para que se pueda ejecutar
 COPY ./wsgi.py /wsgi.py
@@ -43,4 +44,4 @@ COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 COPY ./manage.py  /manage.py 
 RUN ./docker-entrypoint.sh
 WORKDIR /
-CMD ["python", "wsgi.py"]
+CMD ["python3", "wsgi.py"]

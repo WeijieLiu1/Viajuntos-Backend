@@ -85,7 +85,7 @@ def create_event():
     participant = Participant(event.id, user_creator)
 
     # Si es el primer evento que crea, darle el noob host
-    increment_achievement_of_user("noob_host", user_creator)
+    # increment_achievement_of_user("noob_host", user_creator)
 
     try:
         participant.save()
@@ -488,16 +488,16 @@ def get_event(id):
         return jsonify({"error_message": f"The event {event_id} doesn't exist"}), 400
 
     # Si es un evento con contaminacion baja, se añade uno al achievement Healthy Curiosity
-    cont_level, cont_status = general_quality_at_a_point(event.longitud, event.latitude)
-    if cont_status == 200:
-        # Si es un evento con poca contaminacion, suma achievement Social Bug
-        contaminacion = json.loads(cont_level.response[0])
-        if contaminacion["pollution"] < 0.15:
-            auth_id = get_jwt_identity()
-            try:
-                increment_achievement_of_user("healthy_curiosity", auth_id)
-            except:
-                return jsonify({"error_message": f"Error adding an achievement"}), 400
+    # cont_level, cont_status = general_quality_at_a_point(event.longitud, event.latitude)
+    # if cont_status == 200:
+    #     # Si es un evento con poca contaminacion, suma achievement Social Bug
+    #     contaminacion = json.loads(cont_level.response[0])
+    #     if contaminacion["pollution"] < 0.15:
+    #         auth_id = get_jwt_identity()
+    #         try:
+    #             increment_achievement_of_user("healthy_curiosity", auth_id)
+    #         except:
+    #             return jsonify({"error_message": f"Error adding an achievement"}), 400
 
     return jsonify(event.toJSON()), 200
 

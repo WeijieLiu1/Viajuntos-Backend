@@ -32,7 +32,6 @@ def crear_chat_back(event_id, participant_id):
     return jsonify([New_Chat.toJSON()]), 201
 
 
-
 # Crear Mensaje: create a new message
 # Recibe:
 # POST HTTP request con los atributos del nuevo mensaje en el body(JSON)

@@ -17,10 +17,12 @@ from app import hashing
 
 # Import util functions
 from app.utils.email import send_email
-from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
+from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength,EmailVerificationPendant
 
 # Import module models
 from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
+from app.module_admin.models import Admin
+from app.module_chat.models import Like, Message, Chat
 
 # Define the blueprint: 'users', set its url prefix: app.url/users
 module_users_v1 = Blueprint('users', __name__, url_prefix='/v1/users')
@@ -785,11 +787,8 @@ def delete_account(id):
                 return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
             event.delete()
 
-    # Notificar baneo a usuario
-    email_body = f'Dear {user.username}, You have successfully deleted your viajuntos account.'
-    send_email(user.email, 'You have been banned from Viajuntos', email_body)
 
-    # Eliminar métodos de autenticación del usuario baneado
+    # Eliminar métodos de autenticación del usuario
     so_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
     if so_auth != None:
         so_auth.delete()
@@ -799,12 +798,23 @@ def delete_account(id):
     f_auth = FacebookAuth.query.filter_by(id = user.id).first()
     if f_auth != None:
         f_auth.delete()
-# Eliminar logros del usuario baneado
+    v_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
+    if v_auth != None:
+        v_auth.delete()
+    # Eliminar logros del usuario
     ach = AchievementProgress.query.filter_by(user = user.id).all()
     for a in ach:
         a.delete()
+    # Eliminar correo verificacion del usuario
+    evps = EmailVerificationPendant.query.filter_by(user = user.id).all()
+    for evp in evps:
+        evp.delete()
+    # Eliminar like del usuario
+    likes = Like.query.filter_by(user = user.id).all()
+    for like in likes:
+        like.delete()
     
-    # Eliminar amistades del usuario baneado
+    # Eliminar amistades del usuario
     friends = Friend.query.filter_by(invitee = user.id).all()
     friends.extend(Friend.query.filter_by(invited = user.id).all())
     for f in friends:
@@ -817,11 +827,19 @@ def delete_account(id):
     lang = UserLanguage.query.filter_by(user = user.id).all()
     for l in lang:
         l.delete()
-    
+    # Eliminar relación admin de usuario
+    admin = Admin.query.filter_by(user = user.id).all()
+    for a in admin:
+        a.delete()
+        
     # Eliminar usuario
     try:
         user.delete()
     except Exception as e:
         return jsonify({'error_message': 'Error while deleting user instance', 'details': e}), 500
     
+    # Notificar usuario
+    email_body = f'Dear {user.username}, You have successfully deleted your viajuntos account.'
+    send_email(user.email, 'You have been banned from Viajuntos', email_body)
+
     return jsonify({'message': 'You have successfully deleted your viajuntos account.'}), 201

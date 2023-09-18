@@ -143,6 +143,11 @@ $: python manage.py db upgrade
 ```
 Mira con el DBeaver si se han creado las tablas que esperabas en tu PotsgreSQL.
 
+En caso de "Ports are not available", ejecuta la comanda siguiente y ejecuta la bd otra vez
+```
+$: net stop winnat
+```
+
 ***Cuidado!*** Si estás en Windows pero usas el WSL para correr el virtualenv y quieres hacer "migrate" o "upgrade" debes de correr el script testEnv.sh dentro del WSL para que la construcción de la API funcione, y también el testEnvWin.ps1 para que el docker coja las variables de entorno que necesita (al correr sobre Windows).
 
 **NOTA:** Podeis ejecutar ambos entornos a la vez con:
