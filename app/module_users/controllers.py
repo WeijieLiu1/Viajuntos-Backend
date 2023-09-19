@@ -22,7 +22,9 @@ from app.module_users.utils import increment_achievement_of_user, user_id_for_em
 # Import module models
 from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
 from app.module_admin.models import Admin
-from app.module_chat.models import Like, Message, Chat
+from app.module_chat.models import Message, Chat
+from app.module_event.models import Like, Participant
+from app.module_event.controllers_v3 import delete_event
 
 # Define the blueprint: 'users', set its url prefix: app.url/users
 module_users_v1 = Blueprint('users', __name__, url_prefix='/v1/users')
@@ -777,17 +779,24 @@ def delete_account(id):
         for event in all_events:
             # Si el evento era futuro, notificar participantes de que el evento es cancelado.
             if current_time < event.date_started:
+                
                 event_date_str = event.date_started.strftime('%Y-%m-%d')
                 for participant in event.participants_in_event:
+                    
                     participant_user = User.query.filter_by(id = participant.user_id).first()
                     if participant_user.id != user.id:
                         send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
-            # msg, status = event(str(event.id))
+                    Participant.query.filter_by(user_id = participant.id).delete()
+                    print('Hello, World!')
+                    print(user_id)
+                    # participant.delete()
+            msg, status = delete_event(str(event.id))
             if status != 202:
                 return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
             event.delete()
 
 
+    # return jsonify({'error_message': 'Events cannot be successfully deleted.', 'details': msg['error_message']}), 500
     # Eliminar métodos de autenticación del usuario
     so_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
     if so_auth != None:
@@ -806,11 +815,11 @@ def delete_account(id):
     for a in ach:
         a.delete()
     # Eliminar correo verificacion del usuario
-    evps = EmailVerificationPendant.query.filter_by(user = user.id).all()
+    evps = EmailVerificationPendant.query.filter_by(email = user.email).all()
     for evp in evps:
         evp.delete()
     # Eliminar like del usuario
-    likes = Like.query.filter_by(user = user.id).all()
+    likes = Like.query.filter_by(user_id = user.id).all()
     for like in likes:
         like.delete()
     
@@ -828,7 +837,7 @@ def delete_account(id):
     for l in lang:
         l.delete()
     # Eliminar relación admin de usuario
-    admin = Admin.query.filter_by(user = user.id).all()
+    admin = Admin.query.filter_by(id = user.id).all()
     for a in admin:
         a.delete()
         
@@ -842,4 +851,4 @@ def delete_account(id):
     email_body = f'Dear {user.username}, You have successfully deleted your viajuntos account.'
     send_email(user.email, 'You have been banned from Viajuntos', email_body)
 
-    return jsonify({'message': 'You have successfully deleted your viajuntos account.'}), 201
+    return jsonify({'message': 'You have successfully deleted your viajuntos account.'}), 200
