@@ -9,3 +9,5 @@ app/module_airservice/triangulation.pkl
 #docker-compose.yml
 #Dockerfile
 /venv
+requirements2.txt
+requirements3.txt
