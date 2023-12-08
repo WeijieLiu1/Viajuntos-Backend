@@ -17,7 +17,7 @@ from app.module_users.models import AchievementProgress, BannedEmails, FacebookA
 from app.module_users.utils import generate_tokens
 from app.utils.email import send_email
 from app.module_event.models import Event
-from app.module_chat.controllers import borrar_mensajes_usuario
+from app.module_chat.controllers import borrar_todos_chats_usuario
 
 # Define the blueprint: 'admin', set its url prefix: app.url/v1/admin
 module_admin_v1 = Blueprint('admin', __name__, url_prefix='/v1/admin')
@@ -115,9 +115,9 @@ def ban():
     ban_reason = None if 'reason' not in request.json else request.json['reason']
     current_time = datetime.now()
 
-    msg, status = borrar_mensajes_usuario(user_id)
+    msg, status = borrar_todos_chats_usuario(user_id)
     if status != 202:
-        return jsonify({'error_message': 'Chats cannot be successfully deleted.', 'details': msg['error_message']}), 500
+        return jsonify({'error_message': 'Messages cannot be successfully deleted.', 'details': msg['error_message']}), 500
 
     # Buscar los eventos del banned_user
     all_events = Event.query.filter_by(user_creator = banned_user.id).all()

@@ -10,7 +10,8 @@ from app import db
 # Import util functions
 from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
-
+from app.module_chat.models import Chat
+from app.module_chat.controllers import crear_private_chat
 # Import module models
 from app.module_users.models import FriendInvite, User, Achievement, AchievementProgress, Friend, UserLanguage, EmailVerificationPendant, ViajuntosAuth
 
@@ -144,7 +145,7 @@ def request_new_friend_link():
     except Exception as e:
         return jsonify({"error_message": f"Something went wrong inserting new invitation code to DB: {code}"}), 500
 
-    link = os.getenv('API_DOMAIN_NAME') + f'/v2/users/new_friend?code={code}'
+    link = os.getenv('API_DOMAIN_NAME')+':'+os.getenv('API_PORT') + f'/v2/users/new_friend?code={code}'
     return jsonify({'invite_link': link}), 200
 
 @module_users_v2.route('/new_friend', methods=['GET'])
@@ -170,8 +171,10 @@ def accept_friend_link():
     friendship = Friend(invitation.invitee, auth_id)
     friendship.save()
 
-    # Increment achievement when add new friend
-    increment_achievement_of_user('ambassador', invitation.invitee)
+    crear_private_chat(auth_id, invitation.invitee)
+
+    # # Increment achievement when add new friend
+    # increment_achievement_of_user('ambassador', invitation.invitee)
 
     invitation.delete()
     return get_profile(str(invitation.invitee))

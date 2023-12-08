@@ -1,10 +1,11 @@
-
-
+from uuid import UUID
 from app import app
-import os
+import os,json, time, ipdb
 from flask import Flask, render_template
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room, send
 from datetime import datetime
+
+from app.module_chat.controllers import create_message_back
 
 # Flask-SocketIO==4.3.1
 # python-engineio==3.13.2
@@ -18,6 +19,11 @@ from datetime import datetime
 # python-engineio==4.8.0
 # python-socketio==5.10.0
 # Flask-SocketIO==5.3.6
+def default(o):
+    if isinstance(o, UUID):
+        return str(o)
+    if isinstance(o, datetime):
+        return o.isoformat()
 
 # socketio = SocketIO(app, cors_allowed_origins='*')
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins='*')
@@ -44,6 +50,30 @@ def handle_message(message):
     print("Current Time =", current_time)
     print('received message: ' + message)
     socketio.emit('fromServer', "fromServer ok")
+
+@socketio.on('ChatMessage')
+def handle_chat_message(data):
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    chat_id = data['chat_id']
+    text = data['text']
+    sender_id = data['sender_id']
+    print("Current Time =", current_time)
+    print('received message: ' + text+ " to: "+chat_id)
+    print("Current Time =", current_time)
+    # send(message + ' has entered the room.', to=chat_id)
+    msg = create_message_back(sender_id, chat_id, text)
+    socketio.emit('ChatMessage', json.dumps(msg, default=default),to=chat_id)
+    print("chat_id =", chat_id)
+    # socketio.to(chat_id).emit('broadcast_message', message)
+
+@socketio.on('join_room')
+def on_join(data):
+    username = data['username']
+    room = data['room']
+    join_room(room)
+    print(username + ' has entered the room.'+ room )
+    send(username + ' has entered the room.', to=room)
 # socket.io version v2.x
 # connection error: It seems you are trying to reach a Socket.IO server in v2.x with a v3.x client, 
 # but they are not compatible (more information here: https://socket.io/docs/v3/migrating-from-2-x-to-3-0/)

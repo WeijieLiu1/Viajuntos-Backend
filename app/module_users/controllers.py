@@ -1,6 +1,6 @@
 # Import flask dependencies
 from flask import Blueprint, jsonify, request
-from app.module_chat.controllers import borrar_mensajes_usuario
+from app.module_chat.controllers import borrar_todos_chats_usuario
 from app.module_event.models import Event
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
 from datetime import datetime, timedelta, timezone
@@ -272,27 +272,20 @@ def register_viajuntos():
     languages = request.json['languages']
     hobbies = request.json['hobbies']
     verification = request.json['verification']
-    print("verification0: "+verification)
     if len(languages) == 0 or any([l not in ['catalan', 'spanish', 'english'] for l in languages]):
         
         return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
 
     if BannedEmails.exists(email):
         return jsonify({'error_message': 'This email is banned'}), 409
-    print("verification1: "+verification)
     # Check no other user exists with that email
     if user_id_for_email(email) != None:
-        print("verification1.5: "+verification)
         return jsonify({'error_message': 'User with this email already exists'}), 400
-    print("verification2: "+verification)
     # Check password strength
     pw_msg, pw_status = verify_password_strength(pw)
     if pw_status != 200: return pw_msg, pw_status
-    print("verification3: "+verification)
     # Check verification code in codes sent to email
-    print("email: "+email)
     db_verification = EmailVerificationPendant.query.filter(EmailVerificationPendant.email == email).filter(EmailVerificationPendant.expires_at > datetime.now(timezone.utc)).first()
-    print("verification4: "+db_verification.code)
     if db_verification == None:
         return jsonify({'error_message': 'Verification code was never sent to this email or the code has expired.'}), 400
     if db_verification.code != verification:
@@ -300,15 +293,13 @@ def register_viajuntos():
     
     if (len(description) > 180):
         return jsonify({'error_message': f'Description is too long. No more than 180 characters allowed.'}), 400
-    print("verification11: "+verification)
     # Add user to bd
     user_id = uuid.uuid4()
-    user = User(user_id, username, email, description, hobbies)
+    user = User(user_id, username, email, description, hobbies,"")
     try:
         user.save()
     except:
         return jsonify({'error_message': 'Something went wrong when creating new user in db.'}), 500
-    print("verification12: "+verification)
     # Add languages to user
     for l in languages:
         try:
@@ -320,22 +311,18 @@ def register_viajuntos():
     user_salt = get_random_salt(15)
     hashed_pw = hashing.hash_value(pw, salt=user_salt)
     viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
-    print("verification10: "+verification)
     # Increment achievement
     #todo
     # if len(description) > 120:
     #     increment_achievement_of_user('storyteller', user_id)
     # increment_achievement_of_user('credential_multiverse', user_id)
-    print("verification21: "+verification)
     try:
         viajuntos_auth.save()
     except:
         return jsonify({'error_message': 'Something went wrong when adding auth method viajuntos to user.'}), 500
 
     # Remove verification code -> already used
-    print("verification22: "+verification)
     db_verification.delete()
-    print("verification30: "+verification)
     return generate_tokens(str(user_id)), 200
 
 @module_users_v1.route('/register/google', methods=['POST'])
@@ -769,7 +756,7 @@ def delete_account(id):
     if id != auth_id:
         return jsonify({'error_message': 'Users can only delete their own account. '}), 403
     current_time = datetime.now()
-    msg, status = borrar_mensajes_usuario(user_id)
+    msg, status = borrar_todos_chats_usuario(user_id)
     if status != 202:
         return jsonify({'error_message': 'Chats cannot be successfully deleted.', 'details': msg['error_message']}), 500
 
@@ -787,8 +774,6 @@ def delete_account(id):
                     if participant_user.id != user.id:
                         send_email(participant_user.email, 'Event cancellation!', f'We are sorry to inform you that the event titled "{event.name}" that was scheduled for {event_date_str} has been cacelled.\n\nYours sincerely,\nThe Viajuntos team.')
                     Participant.query.filter_by(user_id = participant.id).delete()
-                    print('Hello, World!')
-                    print(user_id)
                     # participant.delete()
             msg, status = delete_event(str(event.id))
             if status != 202:

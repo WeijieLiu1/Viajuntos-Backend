@@ -40,9 +40,12 @@ class Event(db.Model):
     # Relationship with Participant
     participants_in_event = db.relationship(
         'Participant', backref='participants', lazy=True)
+    # Chat of the event
+    chat_id = db.Column(
+        UUID(as_uuid=True), db.ForeignKey('chat.id'), nullable=False)
 
     # To CREATE an instance of an Event
-    def __init__(self, id, name, description, date_started, date_end, user_creator, longitud, latitude, max_participants, event_image_uri):
+    def __init__(self, id, name, description, date_started, date_end, user_creator, longitud, latitude, max_participants, event_image_uri, chat_id):
         self.id = id
         self.name = name
         self.description = description
@@ -53,6 +56,7 @@ class Event(db.Model):
         self.latitude = latitude
         self.max_participants = max_participants
         self.event_image_uri = event_image_uri
+        self.chat_id = chat_id
 
     # To FORMAT an Event in a readable string format
 
@@ -61,7 +65,7 @@ class Event(db.Model):
                 ', date_started: ' + str(self.date_started) + ', date_end: ' + str(self.date_end) +
                 ', date_creation: ' + str(self.date_creation) + ', user_creator: ' + str(self.user_creator) + 
                 ', longitud: ' + str(self.longitud) + ', latitude: ' + str(self.latitude) + 
-                ', max_participants: ' + str(self.max_participants) + ', event_image_uri: ' + str(self.event_image_uri) ').'''
+                ', max_participants: ' + str(self.max_participants) + ', event_image_uri: ' + str(self.event_image_uri) + ', chat_id: ' + str(self.chat_id)').'''
 
     # To DELETE a row from the table
     def delete(self):
@@ -91,7 +95,8 @@ class Event(db.Model):
             "longitud": self.longitud,
             "latitude": self.latitude,
             "max_participants": self.max_participants,
-            "event_image_uri": self.event_image_uri
+            "event_image_uri": self.event_image_uri,
+            "chat_id": self.chat_id
         }
 
 # Define the like class model

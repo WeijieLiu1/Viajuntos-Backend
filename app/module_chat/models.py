@@ -8,7 +8,7 @@ from app import db
 # app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DATABASE')
 # app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-#Defueine the chat model
+#Define the chat model
 class Chat(db.Model):
     '''
     Table Chat
@@ -18,25 +18,28 @@ class Chat(db.Model):
 
     #id del Chat
     id = db.Column(UUID(as_uuid = True), primary_key = True)
+    
+    #type of chat private or group
+    type = db.Column(db.String, nullable=False)
 
-    #id del event
-    event_id = db.Column(UUID(as_uuid = True), db.ForeignKey('events.id'), nullable = False)
+    #nombre del chat
+    name = db.Column(db.String, nullable=False)
 
-    #id del creador del event
-    creador_id = db.Column(UUID(as_uuid = True), db.ForeignKey('users.id'), nullable = False)
+    #id del usuari al que pertany
+    creator_id = db.Column(UUID(as_uuid=True) , db.ForeignKey('users.id'), nullable=True) 
 
-    #id del usuari participant
-    participant_id = db.Column(UUID(as_uuid = True), db.ForeignKey('users.id'), nullable = False)
+    #time when the chat was created
+    created_at = db.Column(db.DateTime, nullable=False, default =  datetime.now() + timedelta(hours=2))
 
     #To create a instance of a Chat
-    def __init__(self, id, event_id, creador_id, participant_id):
+    def __init__(self, id, name, type, creator_id):
         self.id = id
-        self.event_id = event_id
-        self.creador_id = creador_id
-        self.participant_id = participant_id
+        self.name = name
+        self.type = type
+        self.creator_id = creator_id
 
     def __repr__(self):
-        return '''Chat(id: ' str(self.id) + ' , event_id: ' str(self.event_id) + ' , creador_id: ' str(self.creador_id) + ' , participant_id ' str(self.participant_id) ').''' 
+        return f'Chat(id: {self.id}, type: {self.type}, name: {self.name}, type: {self.creator_id}, created_at: {self.created_at})'
 
     #To delete a row from the table
     def delete(self):
@@ -52,11 +55,54 @@ class Chat(db.Model):
     def toJSON(self):
         return{
             "id": self.id,
-            "event_id": self.event_id,
-            "creador_id": self.creador_id,
-            "participant_id": self.participant_id
+            "type": self.type,
+            "name": self.name,
+            "creator_id": self.creator_id,
+            "created_at": self.created_at
         }
+#Defueine the members model
+class Members(db.Model):
+    '''
+    Table Members
+    '''
 
+    __tablename__ = 'members'
+
+    #id del usuari al que pertany
+    user_id = db.Column(UUID(as_uuid=True) , db.ForeignKey('users.id') , primary_key=True)  
+
+    #id del chat al que pertany
+    chat_id = db.Column(UUID(as_uuid=True) , db.ForeignKey('chat.id') , primary_key=True)
+
+    #time when the member joined the chat
+    joined_at = db.Column(db.DateTime, nullable=False, default =  datetime.now() + timedelta(hours=2))
+
+    #To create a instance of a Members
+    def __init__(self, id, chat_id):
+        self.user_id = id
+        self.chat_id = chat_id
+
+    def __repr__(self):
+        return f'Members(user_id: {self.user_id}, chat_id: {self.chat_id}, joined_at: {self.joined_at})'
+
+    #To delete a row from the table 
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    # To save a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+    
+    #To convert a Members object in a dictionary
+    def toJSON(self):
+        return{
+            "id": self.user_id,
+            "chat_id": self.chat_id,
+            "joined_at": self.joined_at,
+        }
+    
 #Define the message model
 class Message(db.Model):
     '''

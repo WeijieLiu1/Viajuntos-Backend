@@ -21,20 +21,25 @@ class User(db.Model):
     # User premuim
     # isPremuim = db.Column(db.bool, default=False, nullable=False)
 
+    # User image url
+    image_url = db.Column(db.String, default="", nullable=True)
+
     # To CREATE an instance of a User
     def __init__(self, id, username, email, description, hobbies, 
             # isPremuim
+            image_url
             ):
         self.id = id
         self.username = username
         self.email = email
         self.description = description
         self.hobbies = hobbies
+        self.image_url = image_url
         # self.isPremuim = isPremuim
 
     def __repr__(self):
         # return f'User({self.id}, {self.username}, {self.description}, {self.hobbies}, {self.isPremuim})'
-        return f'User({self.id}, {self.username}, {self.description}, {self.hobbies})'
+        return f'User({self.id}, {self.username}, {self.description}, {self.hobbies}, {self.image_url})'
     # To DELETE a row from the table
     def delete(self):
         db.session.delete(self)
@@ -53,6 +58,7 @@ class User(db.Model):
             'description': self.description,
             'hobbies': self.hobbies,
             # 'isPremuim': self.isPremuim
+            'image_url': self.image_url
         }
 
 class ViajuntosAuth(db.Model):

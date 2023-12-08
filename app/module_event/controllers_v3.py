@@ -7,7 +7,7 @@ from app.module_admin.models import Admin
 from app.module_airservice.controllers import general_quality_at_a_point
 from app.module_users.utils import increment_achievement_of_user
 
-from app.module_chat.controllers import crear_chat_back, borrar_mensajes_participante, borrar_mensajes_evento
+from app.module_chat.controllers import add_member_back, borrar_mensajes_usuario_chat, borrar_mensajes_y_evento,crear_public_chat, remove_member_back
 from app.module_calendar.functions_calendar import crearEvento, eliminarEventoTitle, editarEventoTitle, editarEventoDesciption
 
 
@@ -19,7 +19,7 @@ from flask import (Blueprint, request, jsonify, current_app)
 import uuid
 import validators
 import json
-
+import ipdb
 # Import the database object from the main app module
 from app import db
 
@@ -69,9 +69,16 @@ def create_event():
     auth_id = get_jwt_identity()
     if str(user_creator) != auth_id:
         return jsonify({"error_message": "Un usuario no puede crear un evento por otra persona"}), 403
-
+    try:
+        new_chat = crear_public_chat(args.get("name"),user_creator,[user_creator])
+        json_string = new_chat[0].response[0].decode('utf-8')
+        chat_id = json.loads(json_string)[0]["id"]
+        ipdb.set_trace()
+    except:
+        return jsonify({"error_message": "Error creating event's chat"}), 400
+    
     event = Event(event_uuid, args.get("name"), args.get("description"), date_started, date_end,
-                  user_creator, longitud, latitude, max_participants, args.get("event_image_uri"))
+                  user_creator, longitud, latitude, max_participants, args.get("event_image_uri"),chat_id)
 
     # Errores al guardar en la base de datos: FK violated, etc
     try:
@@ -102,7 +109,6 @@ def create_event():
         date_end_formatted = event.date_end.strftime("%Y-%m-%dT%H:%M:%S")
         crearEvento(user.access_token, event.name, event.description, event.latitude, event.longitud, date_started_formatted, date_end_formatted)
     
-
     eventJSON = event.toJSON()
     return jsonify(eventJSON), 201
 
@@ -345,7 +351,7 @@ def join_event(id):
             increment_achievement_of_user("social_bug",user_id)
 
     # Se crea un chat entre el participante y el creador
-    err, sts = crear_chat_back(event.id, user_id)
+    err, sts = add_member_back(event.chat_id, user_id)
     if sts != 201:
         return err, 500
 
@@ -417,8 +423,8 @@ def leave_event(id):
                         f"El usuario {user_id} es el creador del evento (no puede abandonar)"}), 400
 
     # Eliminar Chat
-    borrar_mensajes_participante(event_id_b=event_id, participant_id_b=participant.user_id)
-
+    borrar_mensajes_usuario_chat(id_chat=event.chat_id, id_usuario=auth_id)
+    remove_member_back(event.chat_id, user_id)
     # Eliminar el evento del calendario
     auth_id = uuid.UUID(get_jwt_identity())
     user = GoogleAuth.query.filter_by(id=auth_id).first()
@@ -531,11 +537,14 @@ def get_creations():
         events_creats = Event.query.filter_by(user_creator=user_id)
         current_date = datetime.now() + timedelta(hours=2)
         active_events = []
+        if events_creats is not None:
+            if events_creats.count() == 0:
+
+                return jsonify(""), 200
          # Solo añadir los eventos ACTIVOS
-        for event in events_creats:
+        for event in events_creats: 
             if event.date_end >= current_date:
                 active_events.append(event)
-        
         return jsonify([event.toJSON() for event in active_events]), 200
     except:
         return jsonify({"error_message": "An unexpected error ocurred"}), 400
@@ -605,7 +614,7 @@ def delete_event(id):
             return jsonify({"error_message": "error while deleting reviews of an event"}), 400
 
     # Eliminar chat
-    borrar_mensajes_evento(event.id)
+    borrar_mensajes_y_evento(event.id)
 
     # Eliminar el evento del calendario
     auth_id = uuid.UUID(get_jwt_identity())
