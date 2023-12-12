@@ -22,7 +22,7 @@ def crear_private_chat(user1_id, user2_id):
         return jsonify({'error_message': 'No such user.'}), 404
     
     id = uuid.uuid4()
-    New_Chat = Chat(id, "private", "private", "")
+    New_Chat = Chat(id, "private", "private", user2_id)
 
     try:
         New_Chat.save()

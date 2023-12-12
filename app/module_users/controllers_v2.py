@@ -41,7 +41,7 @@ def get_profile(id):
     profile = query_result.toJSON()
     if is_authenticated_id:
         friends = Friend.getFriendsOfUserId(user_id)
-        profile['friends'] = [{'id': f.id, 'username': f.username} for f in friends]
+        profile['friends'] = [{'id': f.id, 'username': f.username,'image_url':f.image_url} for f in friends]
         profile['auth_methods'] = authentication_methods_for_user_id(user_id)
     else:
         del profile['email']

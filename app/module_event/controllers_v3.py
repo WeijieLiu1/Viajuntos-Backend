@@ -64,7 +64,12 @@ def create_event():
     latitude = float(args.get("latitude"))
     max_participants = int(args.get("max_participants"))
     user_creator = uuid.UUID(args.get("user_creator"))
-
+    is_event_free = bool(args.get("is_event_free"))
+    a = args.get("amount_event")
+    if(is_event_free == True):
+        amount_event = 0
+    else:
+        amount_event = float(args.get("amount_event"))
   # restricion: solo puedes crear eventos para tu usuario (mirando Bearer Token)
     auth_id = get_jwt_identity()
     if str(user_creator) != auth_id:
@@ -73,12 +78,11 @@ def create_event():
         new_chat = crear_public_chat(args.get("name"),user_creator,[user_creator])
         json_string = new_chat[0].response[0].decode('utf-8')
         chat_id = json.loads(json_string)[0]["id"]
-        ipdb.set_trace()
     except:
         return jsonify({"error_message": "Error creating event's chat"}), 400
     
     event = Event(event_uuid, args.get("name"), args.get("description"), date_started, date_end,
-                  user_creator, longitud, latitude, max_participants, args.get("event_image_uri"),chat_id)
+                  user_creator, longitud, latitude, max_participants, args.get("event_image_uri"),is_event_free,amount_event,chat_id)
 
     # Errores al guardar en la base de datos: FK violated, etc
     try:

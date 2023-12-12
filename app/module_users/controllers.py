@@ -68,11 +68,14 @@ def update_profile(id):
         return jsonify({'error_message': 'Languages list attribute missing in json'}), 400
     if 'hobbies' not in request.json:
         return jsonify({'error_message': 'Hobbies list attribute missing in json'}), 400
+    if 'image_url' not in request.json:
+        return jsonify({'error_message': 'image_url list attribute missing in json'}), 400
     
     username = request.json['username']
     description = request.json['description']
     languages = request.json['languages']
     hobbies = request.json['hobbies']
+    image_url = request.json['image_url']
 
     if len(languages) == 0 or any([l not in ['catalan', 'spanish', 'english'] for l in languages]):
         return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
@@ -87,7 +90,7 @@ def update_profile(id):
     user.username = username
     user.description = description
     user.hobbies = hobbies
-
+    user.image_url = image_url
     try:
         user.save()
     except:
