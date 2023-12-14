@@ -10,12 +10,12 @@ from app import db
 # Define the blueprint: 'event', set its url prefix: app.url/event
 module_event_v1 = Blueprint('event', __name__, url_prefix='/v1/events')
 
-# Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
-min_longitud_catalunya = 0.15
-max_longitud_catalunya = 3.316667
+# # Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
+# min_longitud_catalunya = 0.15
+# max_longitud_catalunya = 3.316667
 
-min_latitude_catalunya = 40.51667
-max_latitude_catalunya = 42.85
+# min_latitude_catalunya = 40.51667
+# max_latitude_catalunya = 42.85
 
 # Set the route and accepted methods
 
@@ -75,14 +75,14 @@ def create_event():
     except ValueError:
         return jsonify({"error_message": "date_started or date_ended aren't real dates or they don't exist!"}), 400
     
-    # restriction 4: longitud and latitude in Catalunya AND Value Error check
-    try:
-        longitud = float(args.get("longitud"))
-        latitude = float(args.get("latitude"))
-        if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
-            return jsonify({"error_message": "location given by longitud and latitude are outside of Catalunya"}), 400
-    except ValueError:
-        return jsonify({"error_message": "longitud or latitude aren't floats!"}), 400
+    # # restriction 4: longitud and latitude in Catalunya AND Value Error check
+    # try:
+    #     longitud = float(args.get("longitud"))
+    #     latitude = float(args.get("latitude"))
+    #     if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
+    #         return jsonify({"error_message": "location given by longitud and latitude are outside of Catalunya"}), 400
+    # except ValueError:
+    #     return jsonify({"error_message": "longitud or latitude aren't floats!"}), 400
 
     # restriction 5: date started should be right now or in the future    
     if date_started < datetime.now():

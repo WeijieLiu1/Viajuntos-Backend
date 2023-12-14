@@ -1,8 +1,8 @@
 # Import flask dependencies
 # Import module models (i.e. User)
 import sqlalchemy
-from app.module_event.models import Event, Participant, Like, Review
-from app.module_users.models import User, GoogleAuth
+from app.module_event.models import Event, EventType, Participant, Like, Payment, PaymentStatus, Review
+from app.module_users.models import Friend, User, GoogleAuth
 from app.module_admin.models import Admin
 from app.module_airservice.controllers import general_quality_at_a_point
 from app.module_users.utils import increment_achievement_of_user
@@ -26,12 +26,12 @@ from app import db
 # Define the blueprint: 'event', set its url prefix: app.url/event
 module_event_v3 = Blueprint('event_v3', __name__, url_prefix='/v3/events')
 
-# Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
-min_longitud_catalunya = 0.15
-max_longitud_catalunya = 3.316667
+# # Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
+# min_longitud_catalunya = 0.15
+# max_longitud_catalunya = 3.316667
 
-min_latitude_catalunya = 40.51667
-max_latitude_catalunya = 42.85
+# min_latitude_catalunya = 40.51667
+# max_latitude_catalunya = 42.85
 
 # Set the route and accepted methods
 
@@ -65,11 +65,18 @@ def create_event():
     max_participants = int(args.get("max_participants"))
     user_creator = uuid.UUID(args.get("user_creator"))
     is_event_free = bool(args.get("is_event_free"))
-    a = args.get("amount_event")
+    event_type = args.get("event_type")
+    
     if(is_event_free == True):
         amount_event = 0
     else:
         amount_event = float(args.get("amount_event"))
+    if(event_type == "PUBLIC"):
+        enum_type = EventType.PUBLIC
+    elif(event_type == "FRIENDS"):
+        enum_type = EventType.FRIENDS
+    elif(event_type == "PRIVATE"):
+        enum_type = EventType.PRIVATE
   # restricion: solo puedes crear eventos para tu usuario (mirando Bearer Token)
     auth_id = get_jwt_identity()
     if str(user_creator) != auth_id:
@@ -81,7 +88,7 @@ def create_event():
     except:
         return jsonify({"error_message": "Error creating event's chat"}), 400
     
-    event = Event(event_uuid, args.get("name"), args.get("description"), date_started, date_end,
+    event = Event(event_uuid, args.get("name"),enum_type, args.get("description"), date_started, date_end,
                   user_creator, longitud, latitude, max_participants, args.get("event_image_uri"),is_event_free,amount_event,chat_id)
 
     # Errores al guardar en la base de datos: FK violated, etc
@@ -241,14 +248,14 @@ def check_atributes(args, type):
         except ValueError:
             return {"error_message": f"date_started or date_ended aren't real dates or they don't exist!"}
 
-    # restriccion 4: longitud y latitude en Catalunya y checkear Value Error
-    try:
-        longitud = float(args.get("longitud"))
-        latitude = float(args.get("latitude"))
-        if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
-            return {"error_message": "location given by longitud and latitude are outside of Catalunya"}
-    except ValueError:
-        return {"error_message": "longitud or latitude aren't floats!"}
+    # # restriccion 4: longitud y latitude en Catalunya y checkear Value Error
+    # try:
+    #     longitud = float(args.get("longitud"))
+    #     latitude = float(args.get("latitude"))
+    #     if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
+    #         return {"error_message": "location given by longitud and latitude are outside of Catalunya"}
+    # except ValueError:
+    #     return {"error_message": "longitud or latitude aren't floats!"}
 
     # restriccion 5: date started deberia ser ahora mismo o en el futuro
     if type != "modify":
@@ -649,6 +656,20 @@ def get_all_events():
         active_events = Event.query.filter(Event.date_end >= current_date)
     except:
         return jsonify({"error_message": "Error when querying events"}), 400
+    user_id = uuid.UUID(get_jwt_identity())
+    for event in active_events:
+        participant = Participant.query.filter_by(event_id=event.id, user_id=user_id).first()
+        if(participant is None):
+            if(event.event_type == EventType.PRIVATE):
+                if(event.user_creator != user_id):
+                    active_events.remove(event)
+            if(event.event_type == EventType.FRIENDS):
+                if(event.user_creator != user_id):
+                    friends = Friend.getFriendsOfUserId(event.user_creator)
+                    for friend in friends:
+                        if(friend.id == user_id):
+                            active_events.remove(event)
+        
 
     try:
         return jsonify([event.toJSON() for event in active_events]), 200
@@ -718,12 +739,22 @@ def lastest_events():
         lasts_events = Event.query.filter(Event.date_end >= current_date).order_by(Event.date_creation.desc()).all()
     except:
         return {"error_message": "Error while querying events"}
-
+    user_id = uuid.UUID(get_jwt_identity())
     lastten = []
     i = 0
-    for e in lasts_events:
+    for event in lasts_events:
         if i < 10:
-            lastten.append(e)
+            participant = Participant.query.filter_by(event_id=event.id, user_id=user_id).first()
+            if(participant is not None or event.user_creator == user_id):
+                lastten.append(event)
+            else:
+                if(event.event_type == EventType.PUBLIC):
+                    lastten.append(event)
+                elif(event.event_type == EventType.FRIENDS):
+                    friends = Friend.getFriendsOfUserId(event.user_creator)
+                    for friend in friends:
+                        if(friend.id == user_id):
+                            lastten.append(event)
             i += 1
         else:
             break
@@ -1021,15 +1052,35 @@ def get_likes_from_user(iduser, idevento):
 def get_top_ten_events():
     db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
     engine = create_engine(db_uri)
-    sql_query = db.text("select e.id, e.name, e.description, e.date_started, e.date_end, e.date_creation, e.user_creator, e.longitud, e.latitude, e.max_participants, e.event_image_uri from events e left join likes l on e.id = l.event_id where e.date_end >= CURRENT_TIMESTAMP group by e.id order by count(distinct l.user_id) desc limit 10;")
+    sql_query = db.text("select e.id, e.name, e.description, e.date_started, e.date_end, e.date_creation, e.user_creator, e.longitud, e.latitude, e.max_participants, e.event_image_uri, e.is_event_free from events e left join likes l on e.id = l.event_id where e.date_end >= CURRENT_TIMESTAMP group by e.id order by count(distinct l.user_id) desc;")
     with engine.connect() as conn:
         result_as_list = conn.execute(sql_query).fetchall() 
-
+        
+    user_id = uuid.UUID(get_jwt_identity())
     top_ten_with_info = []
+    i = 0
     for result in result_as_list:
-        top_ten_with_info.append(dataToJSON(result))
-
-    return jsonify([dataToJSON(event) for event in result_as_list]), 200
+        if i < 10:
+            event_data = dataToJSON(result)
+            str_event_id = str(event_data["id"])
+            event_id = uuid.UUID(str_event_id)
+            event = Event.query.filter_by(id=event_id).first()
+            participant = Participant.query.filter_by(event_id=event.id, user_id=user_id).first()
+            if(participant is not None or event.user_creator == user_id):
+                top_ten_with_info.append(event)
+                i += 1
+            else:
+                if(event.event_type == EventType.PUBLIC):
+                    top_ten_with_info.append(event)
+                    i += 1
+                elif(event.event_type == EventType.FRIENDS):
+                    friends = Friend.getFriendsOfUserId(event.user_creator)
+                    for friend in friends:
+                        if(friend.id == user_id):
+                            top_ten_with_info.append(event)
+                            i += 1
+            
+    return jsonify([e.toJSON() for e in top_ten_with_info]), 200
 
 
 def dataToJSON(data):
@@ -1044,7 +1095,8 @@ def dataToJSON(data):
         "longitud": data[7],
         "latitude": data[8],
         "max_participants": data[9],
-        "event_image_uri": data[10]
+        "event_image_uri": data[10],
+        "is_event_free": data[11]
     }
 
 ########################################################################### R E V I E W S ##################################################################
@@ -1183,3 +1235,100 @@ def get_reviews_evento():
         review_list.append(r)
 
     return jsonify({'event': event.toJSON(), 'username': user.username, 'email': user.email, 'reviews': [review.toJSON() for review in reviews]}), 200
+
+# add payment data of event
+@module_event_v3.route('/add_payment', methods=['Post'])
+# DEVUELVE:
+# - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
+# - 200: Un objeto JSON con los atributos de la review creada
+@jwt_required(optional=False)
+def add_payment():  
+    # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
+    try:
+        if "event_id" not in request.json:
+            return jsonify({"error_message": "add_paymentthe id of the event isn't in the URL as a query parameter with name eventid :("}), 400
+        else:
+            event_id = uuid.UUID(request.json['event_id'])
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+
+    event = Event.query.get(event_id)
+    if event is None:
+        return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
+    
+    auth_id = uuid.UUID(get_jwt_identity())
+    if(auth_id == event.user_creator):
+        return jsonify({"error_message": f"User {auth_id} is the creator of the event"}), 400
+    if "amount" not in request.json:
+        return jsonify({"error_message": "the amount of the payment isn't in the URL as a query parameter with name eventid :("}), 400
+    else:
+        amount =  request.json['amount']
+        if(event.amount_event != amount):
+            return jsonify({"error_message": f"Amount paid is not the same as the event amount"}), 400
+        
+    if "payment_type" not in request.json:
+        return jsonify({"error_message": "the type of the payment isn't in the URL as a query parameter with name eventid :("}), 400
+    if "payment_id" not in request.json:
+        return jsonify({"error_message": "the id of the payment isn't in the URL as a query parameter with name eventid :("}), 400
+    
+    aux_payment = Payment.query.filter_by(
+        event_id=event_id, user_id=auth_id,status=PaymentStatus.PAID).first()
+    if aux_payment is not None:
+        return jsonify({"error_message": f"User {auth_id} already paid for this event"}), 400
+
+    new_payment = Payment(event_id=event_id, user_id=auth_id, payment_type=request.json['payment_type'], payment_id=request.json['payment_id'], amount=amount, status = PaymentStatus.PAID)
+
+    try:
+        new_payment.save()
+    except sqlalchemy.exc.IntegrityError:
+        return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+    except:
+        return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+    return new_payment.toJSON(), 201
+
+# get payment data of event
+@module_event_v3.route('/get_payment/<id>', methods=['Get'])
+# DEVUELVE:
+# - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
+# - 200: Un objeto JSON con los atributos de la review creada
+@jwt_required(optional=False)
+def get_payment(id):  
+    
+    try:
+        event_id = uuid.UUID(id)
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
+    try:
+        auth_id = uuid.UUID(get_jwt_identity())
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    aux_payment = Payment.query.filter_by(
+        event_id=event_id, user_id=auth_id,status=PaymentStatus.PAID).first()
+    return aux_payment.toJSON(), 200
+
+# get all payment data of event
+@module_event_v3.route('/get_all_payments/<id>', methods=['Get'])
+# DEVUELVE:
+# - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
+# - 200: Un objeto JSON con los atributos de la review creada
+@jwt_required(optional=False)
+def get_all_payments(id):  
+    
+    try:
+        event_id = uuid.UUID(id)
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
+    try:
+        auth_id = uuid.UUID(get_jwt_identity())
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    event = Event.query.get(id)
+    if(auth_id != event.user_creator):
+        return jsonify({"error_message": f"User {auth_id} is not the creator of the event"}), 400
+    
+    aux_payments = Payment.query.filter_by(
+        event_id=event_id, status = PaymentStatus.PAID).all()
+
+    return jsonify([payment.toJSON() for payment in aux_payments]), 200

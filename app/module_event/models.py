@@ -7,8 +7,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 import uuid
 
-# Define an Event model
+class EventType(Enum):
+    PUBLIC = 0
+    FRIENDS = 1
+    PRIVATE = 2
 
+# Define an Event model
 
 class Event(db.Model):
 
@@ -18,6 +22,7 @@ class Event(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4())
     # Event name
     name = db.Column(db.String, nullable=False)
+    event_type = db.Column(db.Enum(EventType), nullable=True, default=EventType.PUBLIC)
     # Event description
     description = db.Column(db.String, nullable=False)
     # Start date of the event
@@ -54,9 +59,10 @@ class Event(db.Model):
     
 
     # To CREATE an instance of an Event
-    def __init__(self, id, name, description, date_started, date_end, user_creator, longitud, latitude, max_participants, event_image_uri,is_event_free,amount_event,chat_id):
+    def __init__(self, id, name, event_type, description, date_started, date_end, user_creator, longitud, latitude, max_participants, event_image_uri,is_event_free,amount_event,chat_id):
         self.id = id
         self.name = name
+        self.event_type = event_type
         self.description = description
         self.date_started = date_started
         self.date_end = date_end
@@ -72,7 +78,7 @@ class Event(db.Model):
     # To FORMAT an Event in a readable string format
 
     def __repr__(self):
-        return '''Event(id: ' + str(self.id) + ', name: ' + str(self.name) + ', description: ' + str(self.description) +
+        return '''Event(id: ' + str(self.id) + ', name: ' + str(self.name)+ ', event_type: ' + str(self.event_type) + ', description: ' + str(self.description) +
                 ', date_started: ' + str(self.date_started) + ', date_end: ' + str(self.date_end) +
                 ', date_creation: ' + str(self.date_creation) + ', user_creator: ' + str(self.user_creator) + 
                 ', longitud: ' + str(self.longitud) + ', latitude: ' + str(self.latitude) + 
@@ -98,6 +104,7 @@ class Event(db.Model):
         return {
             "id": self.id,
             "name": self.name,
+            "event_type": self.event_type.name,
             "description": self.description,
             "date_started": self.date_started,
             "date_end": self.date_end,
@@ -276,6 +283,8 @@ class Payment(db.Model):
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=False)
     # type of payment
     payment_type = db.Column(db.String, nullable=False)
+    # id of payment
+    payment_id = db.Column(db.String, nullable=False)
     # amount of payment
     amount = db.Column(db.Float, nullable=False)
     # status of payment
@@ -284,15 +293,17 @@ class Payment(db.Model):
     event = db.relationship('Event', backref='payments', lazy=True)
     user = db.relationship('User', backref='payments', lazy=True)
 
-    def __init__(self, event_id, user_id, payment_type, amount):
+    def __init__(self, event_id, user_id, payment_type, payment_id, amount,status):
         self.event_id = event_id
         self.user_id = user_id
         self.payment_type = payment_type
+        self.payment_id = payment_id
         self.amount = amount
+        self.status = status
 
     # To FORMAT a Review in a readable string format
     def __repr__(self):
-        return 'Payment(id: ' + str(self.id) + ', event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', payment_type: ' + str(self.payment_type) + ', amount: ' + str(self.amount)+ ', status: ' + str(self.status)+').'
+        return 'Payment(id: ' + str(self.id) + ', event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', payment_type: ' + str(self.payment_type) +', payment_id: ' + str(self.payment_id) + ', amount: ' + str(self.amount)+ ', status: ' + str(self.status)+').'
 
 
     def delete(self):
@@ -313,8 +324,9 @@ class Payment(db.Model):
             "event_id": self.event_id,
             "user_id": self.user_id,
             "payment_type": self.payment_type,
+            "payment_id": self.payment_id,
             "amount": self.amount,
-            "status": self.status,
+            "status": self.status.name,
         }
 
     # Check if the user_id and event_id exist in Participant model before saving the payment

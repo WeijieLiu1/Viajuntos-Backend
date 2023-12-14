@@ -16,12 +16,12 @@ from app import db
 # Define the blueprint: 'event', set its url prefix: app.url/event
 module_event_v2 = Blueprint('event_v2', __name__, url_prefix='/v2/events')
 
-# Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
-min_longitud_catalunya = 0.15
-max_longitud_catalunya = 3.316667
+# # Min y Max longitud and latitude of Catalunya from resource https://www.idescat.cat/pub/?id=aec&n=200&t=2019
+# min_longitud_catalunya = 0.15
+# max_longitud_catalunya = 3.316667
 
-min_latitude_catalunya = 40.51667
-max_latitude_catalunya = 42.85
+# min_latitude_catalunya = 40.51667
+# max_latitude_catalunya = 42.85
 
 # Set the route and accepted methods
 
@@ -192,14 +192,14 @@ def check_atributes(args):
     except ValueError:
         return {"error_message": f"date_started or date_ended aren't real dates or they don't exist!"}
     
-    # restriccion 4: longitud y latitude en Catalunya y checkear Value Error
-    try:
-        longitud = float(args.get("longitud"))
-        latitude = float(args.get("latitude"))
-        if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
-            return {"error_message": "location given by longitud and latitude are outside of Catalunya"}
-    except ValueError:
-        return {"error_message": "longitud or latitude aren't floats!"}
+    # # restriccion 4: longitud y latitude en Catalunya y checkear Value Error
+    # try:
+    #     longitud = float(args.get("longitud"))
+    #     latitude = float(args.get("latitude"))
+    #     if max_longitud_catalunya < longitud or longitud < min_longitud_catalunya or max_latitude_catalunya < latitude or latitude < min_latitude_catalunya:
+    #         return {"error_message": "location given by longitud and latitude are outside of Catalunya"}
+    # except ValueError:
+    #     return {"error_message": "longitud or latitude aren't floats!"}
 
     # restriccion 5: date started deberia ser ahora mismo o en el futuro    
     if date_started < datetime.now():

@@ -75,10 +75,8 @@ def crear_public_chat(chat_name, creator_id, chat_members):
         
         for member in chat_members:
             new_member = Members(member, New_Chat.id)
-            ipdb.set_trace()
             new_member.save()
             
-        ipdb.set_trace()
     except sqlalchemy.exc.IntegrityError:
        return jsonify({"error_message": "FK problems, the user or the event doesn't exists"}), 400
     except:
