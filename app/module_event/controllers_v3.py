@@ -1325,8 +1325,8 @@ def get_all_payments(id):
     except:
         return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
     event = Event.query.get(id)
-    if(auth_id != event.user_creator):
-        return jsonify({"error_message": f"User {auth_id} is not the creator of the event"}), 400
+    # if(auth_id != event.user_creator):
+    #     return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
     
     aux_payments = Payment.query.filter_by(
         event_id=event_id, status = PaymentStatus.PAID).all()
