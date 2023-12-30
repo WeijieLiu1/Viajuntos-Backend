@@ -1,7 +1,7 @@
 # Import flask dependencies
 # Import module models (i.e. User)
 import sqlalchemy
-from app.module_event.models import Event, EventType, Participant, Like, Payment, PaymentStatus, Review
+from app.module_event.models import Event, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
 from app.module_users.models import Friend, User, GoogleAuth
 from app.module_admin.models import Admin
 from app.module_airservice.controllers import general_quality_at_a_point
@@ -1287,7 +1287,7 @@ def add_payment():
     return new_payment.toJSON(), 201
 
 # get payment data of event
-@module_event_v3.route('/get_payment/<id>', methods=['Get'])
+@module_event_v3.route('/<id>/get_payment', methods=['Get'])
 # DEVUELVE:
 # - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
 # - 200: Un objeto JSON con los atributos de la review creada
@@ -1302,13 +1302,13 @@ def get_payment(id):
     try:
         auth_id = uuid.UUID(get_jwt_identity())
     except:
-        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+        return jsonify({"error_message": "auth_id isn't a valid UUID"}), 400
     aux_payment = Payment.query.filter_by(
         event_id=event_id, user_id=auth_id,status=PaymentStatus.PAID).first()
     return aux_payment.toJSON(), 200
 
 # get all payment data of event
-@module_event_v3.route('/get_all_payments/<id>', methods=['Get'])
+@module_event_v3.route('/<id>/get_all_payments', methods=['Get'])
 # DEVUELVE:
 # - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
 # - 200: Un objeto JSON con los atributos de la review creada
@@ -1320,11 +1320,11 @@ def get_all_payments(id):
     except:
         return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
     # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
-    try:
-        auth_id = uuid.UUID(get_jwt_identity())
-    except:
-        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
-    event = Event.query.get(id)
+    # try:
+    #     auth_id = uuid.UUID(get_jwt_identity())
+    # except:
+    #     return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    # event = Event.query.get(id)
     # if(auth_id != event.user_creator):
     #     return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
     
@@ -1332,3 +1332,115 @@ def get_all_payments(id):
         event_id=event_id, status = PaymentStatus.PAID).all()
 
     return jsonify([payment.toJSON() for payment in aux_payments]), 200
+
+# get all post without parent of event
+@module_event_v3.route('/<id>/post/', methods=['Get'])
+def get_posts_without_parent(id): 
+    try: 
+        try:
+            event_id = uuid.UUID(id)
+        except:
+            return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+        posts_without_parent = EventPosts.query.filter_by(event_id=event_id, parent_post_id = None).all()
+
+        # for post_without_parent in posts_without_parent:
+        #     images = PostImages.query.filter_by(post_id=post_without_parent.id).all()
+        #     post_images_uris = []
+        #     for image in images:
+        #         post_images_uris.append(image.post_image_uri)
+            
+        #     post_without_parent.post_image_uris = post_images_uris
+        #     ipdb.set_trace()
+
+        return jsonify([post_without_parent.toJSON() for post_without_parent in posts_without_parent]), 200
+    except:
+        return jsonify({"error_message": "Unexpected error"}), 400
+
+# post a post of event
+@module_event_v3.route('/<id>/post/', methods=['Post'])
+@jwt_required(optional=False)
+def post_a_post(id): 
+    try: 
+        try:
+            event_id = uuid.UUID(id)
+        except:
+            return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+        try:
+            args = request.json
+        except:
+            return jsonify({"error_message": "Mira el JSON body de la request, hay un atributo mal definido"}), 400
+        
+        auth_id = uuid.UUID(get_jwt_identity())
+
+        if args.get("parent_post_id") is None:
+            return jsonify({"error_message": "parent_post_id is invalid"}), 400
+        if args.get("text") is None:
+            return jsonify({"error_message": "text isn't is invalid"}), 400
+        if args.get("post_image_uris") is None:
+            return jsonify({"error_message": "post_image_uris isn't is invalid"}), 400
+        if args.get("parent_post_id") == "":
+            parent_post_id = None
+        new_post = EventPosts(parent_post_id=parent_post_id, event_id=event_id, user_id=auth_id, text=args.get("text"))
+        try:
+            new_post.save()
+            for post_image_uri in args.get("post_image_uris"):
+                new_post_image = PostImages(post_id=new_post.id, post_image_uri=post_image_uri)
+                new_post_image.save()
+        except sqlalchemy.exc.IntegrityError:
+            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+        except:
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+        return new_post.toJSON(), 200
+    except:
+        return jsonify({"error_message": "Unexpected error"}), 400
+# get all children-post of post of event
+@module_event_v3.route('/<id>/post/<post_id>', methods=['Get'])
+def get_children_post(id, post_id): 
+    try: 
+        try:
+            event_id = uuid.UUID(id)
+        except:
+            return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+        
+        children_post = EventPosts.query.filter_by(event_id=event_id, parent_post_id = post_id).all()
+        return jsonify([child_post.toJSON() for child_post in children_post]), 200
+    except:
+        return jsonify({"error_message": "Unexpected error"}), 400
+
+# like a post
+@module_event_v3.route('/<id>/post/<post_id>/like', methods=['Put'])
+@jwt_required(optional=False)
+def put_like_post(id,post_id):
+    
+    try:
+        event_id = uuid.UUID(id)
+    except:
+        return jsonify({"error_message": "Event_id isn't a valid UUID"}), 400
+    event = Event.query.get(event_id)
+    if event is None:
+        return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if user is None:
+        return jsonify({"error_message": f"User {user_id} doesn't exist"}), 400
+    
+    post = EventPosts.query.get(post_id)
+    if post is None:
+        return jsonify({"error_message": f"Post {post_id} doesn't exist"}), 400
+
+    like_post = LikePost.query.filter_by(user_id=user_id, post_id=post_id).first()
+    if(like_post is not None):
+        # delete like
+        like_post.delete()
+        return jsonify({"message": "Successful delete like"}), 200
+    else :
+        new_like_post = LikePost(user_id=user_id, post_id=post_id)
+        try:
+            new_like_post.save()
+        except sqlalchemy.exc.IntegrityError:
+            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+        except:
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+        return jsonify({"message": "Successful create like"}), 200
+

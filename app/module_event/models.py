@@ -120,8 +120,6 @@ class Event(db.Model):
         }
 
 # Define the like class model
-
-
 class Like(db.Model):
 
     __tablename__ = 'likes'
@@ -345,7 +343,152 @@ class Payment(db.Model):
             return True
         else:
             return False
+        
+# Define a Event's Post model
+class EventPosts(db.Model):
 
+    __tablename__ = 'event_posts'
+
+    # id of post
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # id of parent post
+    parent_post_id = db.Column(db.Integer, db.ForeignKey('event_posts.id'))
+    # Event id
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey(
+        'events.id'))
+    # User id
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(
+        'users.id'))
+    # Date of creation of the post
+    datetime = db.Column(db.DateTime, nullable=False, default=datetime.now())
+
+    # text de una Event's Post
+    text = db.Column(db.String, nullable=False)
+    
+    # To CREATE an instance of a EventPosts
+
+    def __init__(self, parent_post_id, event_id,user_id, text):
+        self.parent_post_id = parent_post_id
+        self.event_id = event_id
+        self.user_id = user_id
+        self.text = text
+
+    # To FORMAT a EventPosts in a readable string format
+    def __repr__(self):
+        return 'EventPosts(parent_post_id: ' + str(self.parent_post_id) + ', event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', text: ' + str(self.text)  +', likes: ' + str(LikePost.query.filter_by(post_id=self.id).count()) + ').'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    @staticmethod
+    # To GET ALL ROWS of the table
+    def get_all():
+        return EventPosts.query.all()
+
+    # To CONVERT a EventPosts object to a dictionary
+    def toJSON(self):
+        return {
+            "id": self.id,
+            "parent_post_id": self.parent_post_id,
+            "event_id": self.event_id,
+            "user_id": self.user_id,
+            "datetime": self.datetime,
+            "text": self.text,
+            "likes": LikePost.query.filter_by(post_id=self.id).count(),
+            "post_image_uris": [post_image.post_image_uri for post_image in PostImages.query.filter_by(post_id=self.id).all()]
+        }
+# defining the post images table
+class PostImages(db.Model):
+    __tablename__ = 'post_images'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # Event id
+    post_id = db.Column(db.Integer, db.ForeignKey(
+        'event_posts.id'))
+    # Image of event (can be null)
+    post_image_uri = db.Column(db.String, default="", nullable=True)
+
+    def __init__(self, post_id, post_image_uri):
+        self.post_id = post_id
+        self.post_image_uri = post_image_uri
+
+    # To FORMAT a PostImages in a readable string format
+    def __repr__(self):
+        return 'PostImages(id: ' + str(self.id) + ', post_id: ' + str(self.post_id)+ ', post_image_uri: ' + str(self.post_image_uri) +  ').'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    @staticmethod
+    # To GET ALL ROWS of the table
+    def get_all():
+        return PostImages.query.all()
+
+    # To CONVERT a PostImages object to a dictionary
+    def toJSON(self):
+        return {
+            "id": self.id,
+            "post_id": self.post_id,
+            "post_image_uri": self.post_image_uri,
+        }
+
+
+# Define the like class model
+class LikePost(db.Model):
+
+    __tablename__ = 'likes_post'
+
+    # Event id
+    post_id = db.Column(db.Integer, db.ForeignKey(
+        'event_posts.id'), primary_key=True)
+    # User id
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(
+        'users.id'), primary_key=True)
+
+    # To create an instance of Like
+
+    def __init__(self, user_id, post_id):
+
+        self.user_id = user_id
+        self.post_id = post_id
+
+    # To FORMAT an Like in a readable string format
+    def __repr__(self):
+        return 'LikePost(user_id: ' + str(self.user_id) + ', post_id: ' + str(self.post_id) + ').'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    # To GET ALL ROWS of the table
+    def get_all():
+        return Like.query.all()
+
+    # To CONVERT an Eent objecto to a dictionary
+    def toJSON(self):
+        return{
+            "user_id": self.user_id,
+            "post_id": self.post_id
+        }
 
 # # Define Event Fee model
 # class EventFee(db.Model):
