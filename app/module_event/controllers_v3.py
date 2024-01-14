@@ -657,25 +657,26 @@ def get_all_events():
     except:
         return jsonify({"error_message": "Error when querying events"}), 400
     user_id = uuid.UUID(get_jwt_identity())
+    filtered_events = []
+
     for event in active_events:
         participant = Participant.query.filter_by(event_id=event.id, user_id=user_id).first()
-        if(participant is None):
-            if(event.event_type == EventType.PRIVATE):
-                if(event.user_creator != user_id):
-                    active_events.remove(event)
-            if(event.event_type == EventType.FRIENDS):
-                if(event.user_creator != user_id):
+        if participant is None:
+            if event.event_type == EventType.PRIVATE:
+                if event.user_creator != user_id:
+                    continue
+            if event.event_type == EventType.FRIENDS:
+                if event.user_creator != user_id:
                     friends = Friend.getFriendsOfUserId(event.user_creator)
-                    for friend in friends:
-                        if(friend.id == user_id):
-                            active_events.remove(event)
-        
+                    is_friend = any(friend.id == user_id for friend in friends)
+                    if not is_friend:
+                        continue
+        filtered_events.append(event)
 
     try:
-        return jsonify([event.toJSON() for event in active_events]), 200
+        return jsonify([event.toJSON() for event in filtered_events]), 200
     except:
         return jsonify({"error_message": "Unexpected error when passing events to JSON format"}), 400
-
 
 # FILTRAR EVENTO: Retorna un conjunto de eventos en base a unas caracteristicas
 # Recibe:
@@ -1305,8 +1306,11 @@ def get_payment(id):
         return jsonify({"error_message": "auth_id isn't a valid UUID"}), 400
     aux_payment = Payment.query.filter_by(
         event_id=event_id, user_id=auth_id,status=PaymentStatus.PAID).first()
+    if aux_payment is None:
+        return jsonify({"error_message": "No payment found"}), 400
+    
     return aux_payment.toJSON(), 200
-
+# return jsonify(aux_payment.toJSON()), 200
 # get all payment data of event
 @module_event_v3.route('/<id>/get_all_payments', methods=['Get'])
 # DEVUELVE:

@@ -188,7 +188,6 @@ def get_chat_members(id_chat):
             users.append(User.query.filter_by(id = member.user_id).first())
     except:
         return jsonify({"error_message": "Falla el consultar los miembros de chat"}), 400
-
     return jsonify([user.toJSON() for user in users]), 202
 
 # Crear Mensaje: create a new message
