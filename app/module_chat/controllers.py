@@ -2,7 +2,7 @@
 # Import module models
 import sqlalchemy 
 from app.module_chat.models import Message, Chat, Members
-from app.module_event.models import Event
+from app.module_event.models import Event, EventImages
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.module_users.models import User
 import uuid, ipdb
@@ -483,7 +483,8 @@ def get_chat_image_url(id):
                     return jsonify({"image_url": user.image_url}), 200
         else:
             event = Event.query.filter_by(chat_id = Chat_buscat.id).first()
-            return jsonify({"image_url": event.event_image_uri}), 200
+            event_image_uri = EventImages.query.filter_by(event_id = event.id).first()
+            return jsonify({"image_url": event_image_uri.event_image_uri}), 200
     except:
         return jsonify({"error_message": "Error cuando buscando el link del imagen del chat"}), 400
 

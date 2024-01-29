@@ -1,7 +1,8 @@
 # Import flask dependencies
 # Import module models (i.e. User)
+import os
 import sqlalchemy
-from app.module_event.models import Event, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
+from app.module_event.models import Event, EventImages, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
 from app.module_users.models import Friend, User, GoogleAuth
 from app.module_admin.models import Admin
 from app.module_airservice.controllers import general_quality_at_a_point
@@ -9,7 +10,7 @@ from app.module_users.utils import increment_achievement_of_user
 
 from app.module_chat.controllers import add_member_back, borrar_mensajes_usuario_chat, borrar_mensajes_y_evento,crear_public_chat, remove_member_back
 from app.module_calendar.functions_calendar import crearEvento, eliminarEventoTitle, editarEventoTitle, editarEventoDesciption
-
+import secrets
 
 from profanityfilter import ProfanityFilter
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -22,7 +23,7 @@ import json
 import ipdb
 # Import the database object from the main app module
 from app import db
-
+from wsgi import socketio
 # Define the blueprint: 'event', set its url prefix: app.url/event
 module_event_v3 = Blueprint('event_v3', __name__, url_prefix='/v3/events')
 
@@ -89,8 +90,8 @@ def create_event():
         return jsonify({"error_message": "Error creating event's chat"}), 400
     
     event = Event(event_uuid, args.get("name"),enum_type, args.get("description"), date_started, date_end,
-                  user_creator, longitud, latitude, max_participants, args.get("event_image_uri"),is_event_free,amount_event,chat_id)
-
+                  user_creator, longitud, latitude, max_participants,is_event_free,amount_event,chat_id)
+    
     # Errores al guardar en la base de datos: FK violated, etc
     try:
         event.save()
@@ -99,12 +100,24 @@ def create_event():
     except:
         return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
 
+    event_image_uris = args.get("event_image_uris")
+    for event_image_uri in event_image_uris:
+        event_image_uuid = uuid.uuid4()
+        event_image = EventImages(event_image_uuid,event.id, event_image_uri)
+        
+        try:
+            event_image.save()
+        except Exception as e:
+            
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+
     # Añadir el creador al evento como participante
     participant = Participant(event.id, user_creator)
 
     # Si es el primer evento que crea, darle el noob host
     # increment_achievement_of_user("noob_host", user_creator)
 
+    
     try:
         participant.save()
     except sqlalchemy.exc.IntegrityError:
@@ -160,7 +173,7 @@ def modify_events_v2(id):
         return jsonify(response), 400
 
     # restricion: solo el usuario creador puede editar su evento
-    if event.user_creator != uuid.UUID(args.get("user_creator")):
+    if event.user_creator != uuid.UUID(get_jwt_identity()):
         return jsonify({"error_message": "solo el usuario creador puede modificar su evento"}), 400
 
     # restricion: solo el usuario creador puede modificar su evento (mirando Bearer Token)
@@ -181,8 +194,35 @@ def modify_events_v2(id):
     event.longitud = float(args.get("longitud"))
     event.latitude = float(args.get("latitude"))
     event.max_participants = int(args.get("max_participants"))
-    event.event_image_uri = args.get("event_image_uri")
+    
+    event_image_uris = set(args.get("event_image_uris"))
 
+    old_event_images = EventImages.query.filter_by(event_id=event.id).all()
+    old_event_image_uris = set(image.event_image_uri for image in old_event_images)
+
+    # 找到需要删除的旧图片链接
+    removed_images_uris = old_event_image_uris - event_image_uris
+    for event_image_uri in removed_images_uris:
+        # 找到需要删除的图片记录
+        event_image_to_remove = next(
+            image for image in old_event_images if image.event_image_uri == event_image_uri
+        )
+        try:
+            event_image_to_remove.delete()
+        except Exception as e:
+            return jsonify({"error_message": "Error de DB al eliminar imágenes antiguas"}), 400
+
+    # 添加新的图片链接
+    new_images_uris = event_image_uris - old_event_image_uris
+    for event_image_uri in new_images_uris:
+        event_image_uuid = uuid.uuid4()
+        event_image = EventImages(event_image_uuid, event.id, event_image_uri)
+        try:
+            event_image.save()
+        except Exception as e:
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+
+    # event.event_image_uri = args.get("event_image_uri")
     # Errores al guardar en la base de datos: FK violated, etc
     try:
         event.save()
@@ -207,16 +247,16 @@ def check_atributes(args, type):
             return {"error_message": "atributo date_started no esta en la URL o es null"}
         if args.get("date_end") is None:
             return {"error_message": "atributo date_end no esta en la URL o es null"}
-    if args.get("user_creator") is None:
-        return {"error_message": "atributo user_creator no esta en la URL o es null"}
+        if args.get("user_creator") is None:
+            return {"error_message": "atributo user_creator no esta en la URL o es null"}
     if args.get("longitud") is None:
         return {"error_message": "atributo longitud no esta en la URL o es null"}
     if args.get("latitude") is None:
         return {"error_message": "atributo latitud no esta en la URL o es null"}
     if args.get("max_participants") is None:
         return {"error_message": "atributo max_participants no esta en la URL o es null"}
-    if args.get("event_image_uri") is None:
-        return {"error_message": "atributo event_image_uri no esta en la URL o es null"}
+    if args.get("event_image_uris") is None:
+        return {"error_message": "atributo event_image_uris no esta en la URL o es null"}
 
     # restriccion 1: mirar las palabras vulgares en el nombre y la descripcion
     pf = ProfanityFilter()
@@ -226,15 +266,16 @@ def check_atributes(args, type):
         return {"error_message": "The description attribute is vulgar"}
 
     # restriccion 2: Atributos string estan vacios
-    try:
-        user_creator = uuid.UUID(args.get("user_creator"))
-    except ValueError:
-        return {"error_message": f"user_creator id isn't a valid UUID"}
+    if type != "modify":
+        try:
+            user_creator = uuid.UUID(args.get("user_creator"))
+        except ValueError:
+            return {"error_message": f"user_creator id isn't a valid UUID"}
     if not isinstance(args.get("name"), str):
         return {"error_message": "name isn't a string!"}
     if not isinstance(args.get("description"), str):
         return {"error_message": "description isn't a string!"}
-    if len(args.get("name")) == 0 | len(args.get("description")) == 0 | len(str(user_creator)) == 0:
+    if len(args.get("name")) == 0 or len(args.get("description")) == 0 or (type != "modify" and len(str(user_creator)) == 0 ):
         return {"error_message": "name, description or user_creator is empty!"}
 
     # restriccion 3: date started es mas grande que end date del evento (format -> 2015-06-05 10:20:10) y Comprobar Value Error
@@ -279,11 +320,16 @@ def check_atributes(args, type):
         return {"error_message": f"el numero maximo de participantes ({max_participants}) ha de ser mas grande que 2"}
 
     # restriccion 9: imagen del evento no es una URL valida (pero si no hay no pasa nada)
-    if len(args.get("event_image_uri")) != 0:
-        if not validators.url(args.get("event_image_uri")):
-            return {"error_message": "la imagen del evento no es una URL valida"}
+    event_image_uris = args.get("event_image_uris")
+    if event_image_uris is not None:
+        for event_image_uri in event_image_uris:
+            if not validators.url(event_image_uri):
+                return {"error_message": "la imagen del evento no es una URL valida"}
+    
 
     return {"error_message": "all good"}
+
+
 
 
 # UNIRSE EVENTO: Usuario se une a un evento
@@ -342,8 +388,8 @@ def join_event(id):
     current_date = datetime.now() + timedelta(hours=2)
     if event.date_end <= current_date:
         return jsonify({"error_message": f"El evento {event_id} ya ha acabado!"}), 400
-
-    participant = Participant(event_id, user_id)
+    verification_code = generate_verification_code()
+    participant = Participant(event_id, user_id,verification_code)
 
     # Errores al guardar en la base de datos: FK violated, etc
     try:
@@ -865,6 +911,11 @@ def get_past_evento():
 
 ########################################################################### O T R O S ########################################################
 
+#  genera un codigo de verificacion para un evento
+def generate_verification_code():
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    verification_code = ''.join(secrets.choice(alphabet) for _ in range(6))  # 生成一个包含 6 个字符的验证码
+    return verification_code
 
 # If the event doesn't exist
 @module_event_v3.errorhandler(404)
@@ -1053,7 +1104,7 @@ def get_likes_from_user(iduser, idevento):
 def get_top_ten_events():
     db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
     engine = create_engine(db_uri)
-    sql_query = db.text("select e.id, e.name, e.description, e.date_started, e.date_end, e.date_creation, e.user_creator, e.longitud, e.latitude, e.max_participants, e.event_image_uri, e.is_event_free from events e left join likes l on e.id = l.event_id where e.date_end >= CURRENT_TIMESTAMP group by e.id order by count(distinct l.user_id) desc;")
+    sql_query = db.text("select e.id, e.name, e.description, e.date_started, e.date_end, e.date_creation, e.user_creator, e.longitud, e.latitude, e.max_participants, e.is_event_free from events e left join likes l on e.id = l.event_id where e.date_end >= CURRENT_TIMESTAMP group by e.id order by count(distinct l.user_id) desc;")
     with engine.connect() as conn:
         result_as_list = conn.execute(sql_query).fetchall() 
         
@@ -1096,8 +1147,7 @@ def dataToJSON(data):
         "longitud": data[7],
         "latitude": data[8],
         "max_participants": data[9],
-        "event_image_uri": data[10],
-        "is_event_free": data[11]
+        "is_event_free": data[10]
     }
 
 ########################################################################### R E V I E W S ##################################################################
@@ -1354,8 +1404,9 @@ def get_posts_without_parent(id):
         #         post_images_uris.append(image.post_image_uri)
             
         #     post_without_parent.post_image_uris = post_images_uris
-        #     ipdb.set_trace()
-
+        #     
+        # a = posts_without_parent[0]
+        # ipdb.set_trace()  
         return jsonify([post_without_parent.toJSON() for post_without_parent in posts_without_parent]), 200
     except:
         return jsonify({"error_message": "Unexpected error"}), 400
@@ -1447,4 +1498,53 @@ def put_like_post(id,post_id):
         except:
             return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
         return jsonify({"message": "Successful create like"}), 200
+
+########################################################################### REGISTER ########################################################
+
+
+@module_event_v3.route('/<id>/verify_code', methods=['GET'])
+@jwt_required(optional=False)
+def get_verification_code(id):
+    auth_id = uuid.UUID(get_jwt_identity())
+    participant = Participant.query.filter_by(event_id=id, user_id=auth_id).first()
+    if participant is None:
+        return jsonify({"error_message": "You are not participant of this event"}), 400
+    code = participant.verification_code
+
+    link = os.getenv('API_DOMAIN_NAME')+':'+os.getenv('API_PORT') + f'/v3/events/{id}/verify_event?username={auth_id}&code={code}'
+    return jsonify({'verify_code': link}), 200
+
+@module_event_v3.route('/<id>/verify_event', methods=['GET'])
+@jwt_required(optional=False)
+def get_verify_event(id):
+    auth_id = uuid.UUID(get_jwt_identity())
+    event = Event.query.get(id)
+    msg = ""
+    if event is None:
+        msg = "Event doesn't exist"
+        # return jsonify({"error_message": "Event doesn't exist"}), 400
+    if event.user_creator != auth_id:
+        msg = "You are not the creator of this event"
+        # return jsonify({"error_message": "You are not the creator of this event"}), 400
+    code = request.args.get('code')
+    username = request.args.get('username')
+    participant = Participant.query.filter_by(event_id=id,user_id = username, verification_code=code).first()
+
+    if participant is None:
+        msg = "User or Code is not correct for this event"
+        # return jsonify({"error_message": "User or Code is not correct for this event"}), 400
+    else:
+        if participant.time_verified is not None:
+            msg = "User already verified"
+            # return jsonify({"message": "User already verified"}), 200
+        else:
+            participant.time_verified = datetime.now()
+            participant.save()
+            msg = "Successful verification"
+            # socketio.emit('VerificationDone', to='628a0571-605a-49d4-9c81-d71773eaff7f_38d1837b-c4ea-4e0a-98e5-ba09a4ee69bd')
+    socketio.emit('VerificationDone', msg,to='628a0571-605a-49d4-9c81-d71773eaff7f_38d1837b-c4ea-4e0a-98e5-ba09a4ee69bd')
+    return jsonify({"message": msg}), 200
+
+
+
 

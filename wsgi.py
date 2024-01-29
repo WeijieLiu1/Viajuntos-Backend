@@ -6,6 +6,8 @@ from flask_socketio import SocketIO, join_room, send
 from datetime import datetime
 
 from app.module_chat.controllers import create_message_back
+from app.module_event.models import Participant
+# from app.module_event.controllers_v3 import verify_code_backend
 
 # Flask-SocketIO==4.3.1
 # python-engineio==3.13.2
@@ -35,10 +37,11 @@ def connect():
     print("a client connected")
     socketio.emit('msg', "Server: client connected")
     socketio.emit('ping', "Server: client connected")
+    # socketio.emit('VerificationDone', json.dumps(msg, default=default),to='628a0571-605a-49d4-9c81-d71773eaff7f_38d1837b-c4ea-4e0a-98e5-ba09a4ee69bd')
 
 @socketio.on('disconnect')
 def disconnect():
-    now = datetime.now()
+    now = datetime.now()    
     current_time = now.strftime("%H:%M:%S")
     print("Current Time =", current_time)
     print('Client disconnected')
@@ -67,6 +70,8 @@ def handle_chat_message(data):
     print("chat_id =", chat_id)
     # socketio.to(chat_id).emit('broadcast_message', message)
 
+
+
 @socketio.on('join_room')
 def on_join(data):
     username = data['username']
@@ -74,6 +79,17 @@ def on_join(data):
     join_room(room)
     print(username + ' has entered the room.'+ room )
     send(username + ' has entered the room.', to=room)
+
+@socketio.on('be_scanning')
+def on_be_scanning(data):
+    username = data['username']
+    room = data['idEvent'] + "_"+username
+    # room = 'idEvent'
+    join_room(room)
+    print('be_scanning: '+username + ' has entered the room.'+ room )
+    socketio.emit('CheckVerification','nada', to='628a0571-605a-49d4-9c81-d71773eaff7f_38d1837b-c4ea-4e0a-98e5-ba09a4ee69bd')
+    send(username + ' has entered the room.', to=room)
+    
 # socket.io version v2.x
 # connection error: It seems you are trying to reach a Socket.IO server in v2.x with a v3.x client, 
 # but they are not compatible (more information here: https://socket.io/docs/v3/migrating-from-2-x-to-3-0/)

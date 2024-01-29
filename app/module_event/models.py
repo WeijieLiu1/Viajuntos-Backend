@@ -41,8 +41,6 @@ class Event(db.Model):
     latitude = db.Column(db.Float, nullable=False)
     # Number of max participants of the event
     max_participants = db.Column(db.Integer, nullable=False)
-    # Image of event (can be null)
-    event_image_uri = db.Column(db.String, default="", nullable=True)
     
     # Chat of the event
     chat_id = db.Column(
@@ -59,7 +57,7 @@ class Event(db.Model):
     
 
     # To CREATE an instance of an Event
-    def __init__(self, id, name, event_type, description, date_started, date_end, user_creator, longitud, latitude, max_participants, event_image_uri,is_event_free,amount_event,chat_id):
+    def __init__(self, id, name, event_type, description, date_started, date_end, user_creator, longitud, latitude, max_participants,is_event_free,amount_event,chat_id):
         self.id = id
         self.name = name
         self.event_type = event_type
@@ -70,7 +68,6 @@ class Event(db.Model):
         self.longitud = longitud
         self.latitude = latitude
         self.max_participants = max_participants
-        self.event_image_uri = event_image_uri
         self.is_event_free = is_event_free
         self.amount_event = amount_event
         self.chat_id = chat_id
@@ -113,10 +110,51 @@ class Event(db.Model):
             "longitud": self.longitud,
             "latitude": self.latitude,
             "max_participants": self.max_participants,
-            "event_image_uri": self.event_image_uri,
+            "event_image_uris": [event_image.event_image_uri for event_image in EventImages.query.filter_by(event_id=self.id).all()],
             "is_event_free": self.is_event_free,
             "amount_event": self.amount_event,
             "chat_id": self.chat_id
+        }
+# defining the event images table
+class EventImages(db.Model):
+    __tablename__ = 'event_images'
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4())
+    # Event id
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey(
+        'events.id'),default=uuid.uuid4())
+    # Image of event (can be null)
+    event_image_uri = db.Column(db.String, default="", nullable=True)
+
+    def __init__(self, id, event_id, event_image_uri):
+        self.id = id
+        self.event_id = event_id
+        self.event_image_uri = event_image_uri
+
+    # To FORMAT a EventImages in a readable string format
+    def __repr__(self):
+        return 'EventImages(id: ' + str(self.id) + ', event_id: ' + str(self.event_id)+ ', event_image_uri: ' + str(self.event_image_uri) +  ').'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    @staticmethod
+    # To GET ALL ROWS of the table
+    def get_all():
+        return PostImages.query.all()
+
+    # To CONVERT a PostImages object to a dictionary
+    def toJSON(self):
+        return {
+            "id": self.id,
+            "event_id": self.event_id,
+            "event_image_uri": self.event_image_uri,
         }
 
 # Define the like class model
@@ -163,7 +201,6 @@ class Like(db.Model):
             "event_id": self.event_id
         }
 
-
 # Define a Participant model
 class Participant(db.Model):
 
@@ -175,17 +212,22 @@ class Participant(db.Model):
     # User id
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(
         'users.id'), primary_key=True)
+    # Verification code
+    verification_code = db.Column(db.String, nullable=False)
+    
+
+    time_verified = db.Column(db.DateTime, nullable=True)
 
     # To CREATE an instance of a Participant
-
-    def __init__(self, event_id, user_id):
-
+    def __init__(self, event_id, user_id, verification_code):
         self.event_id = event_id
         self.user_id = user_id
+        self.verification_code = verification_code
+        self.time_verified = None
 
     # To FORMAT a Participant in a readable string format
     def __repr__(self):
-        return 'Participant(event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ').'
+        return 'Participant(event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', verification_code: ' + str(self.verification_code)  +', time_verified: ' + str(self.time_verified) + ').'
 
     # To DELETE a row from the table
     def delete(self):
@@ -207,7 +249,10 @@ class Participant(db.Model):
         return {
             "event_id": self.event_id,
             "user_id": self.user_id,
+            "verification_code": self.verification_code,
+            "time_verified": self.time_verified
         }
+
 
 
 # Define a Review model
