@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 53d725ec338c
+Revision ID: da6e8c94d686
 Revises: 
-Create Date: 2023-05-18 22:50:04.615939
+Create Date: 2024-09-25 02:27:01.369106
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '53d725ec338c'
+revision = 'da6e8c94d686'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -38,13 +38,6 @@ def upgrade():
     sa.Column('codi_comarca', sa.Float(), nullable=True),
     sa.PrimaryKeyConstraint('eoi_code')
     )
-    op.create_table('banned_emails',
-    sa.Column('email', sa.String(), nullable=False),
-    sa.Column('username', sa.String(), nullable=False),
-    sa.Column('date', sa.DateTime(), nullable=False),
-    sa.Column('reason', sa.String(), nullable=True),
-    sa.PrimaryKeyConstraint('email')
-    )
     op.create_table('email_verification',
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('code', sa.String(), nullable=False),
@@ -70,6 +63,7 @@ def upgrade():
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=False),
     sa.Column('hobbies', sa.String(), nullable=False),
+    sa.Column('image_url', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
     )
@@ -97,19 +91,24 @@ def upgrade():
     sa.ForeignKeyConstraint(['station_eoi_code'], ['air_quality_station.eoi_code'], ),
     sa.PrimaryKeyConstraint('date_hour', 'station_eoi_code', 'pollutant_composition')
     )
-    op.create_table('events',
+    op.create_table('banned_users',
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('id_user', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('date', sa.DateTime(), nullable=False),
+    sa.Column('reason', sa.String(), nullable=True),
+    sa.Column('id_admin', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.ForeignKeyConstraint(['id_admin'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['id_user'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('email')
+    )
+    op.create_table('chat',
     sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('type', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
-    sa.Column('description', sa.String(), nullable=False),
-    sa.Column('date_started', sa.DateTime(), nullable=False),
-    sa.Column('date_end', sa.DateTime(), nullable=False),
-    sa.Column('date_creation', sa.DateTime(), nullable=False),
-    sa.Column('user_creator', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('longitud', sa.Float(), nullable=False),
-    sa.Column('latitude', sa.Float(), nullable=False),
-    sa.Column('max_participants', sa.Integer(), nullable=False),
-    sa.Column('event_image_uri', sa.String(), nullable=True),
-    sa.ForeignKeyConstraint(['user_creator'], ['users.id'], ),
+    sa.Column('creator_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['creator_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('facebook_auth',
@@ -139,6 +138,21 @@ def upgrade():
     sa.ForeignKeyConstraint(['id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('premium_expiration',
+    sa.Column('user', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('expiration_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('user')
+    )
+    op.create_table('reported_user',
+    sa.Column('id_user', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id_user_reported', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('comment', sa.String(length=1000), nullable=False),
+    sa.CheckConstraint('id_user <> id_user_reported'),
+    sa.ForeignKeyConstraint(['id_user'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['id_user_reported'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id_user', 'id_user_reported')
+    )
     op.create_table('user_lang',
     sa.Column('user', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('language', sa.Enum('catalan', 'spanish', 'english', name='lang'), nullable=False),
@@ -152,14 +166,69 @@ def upgrade():
     sa.ForeignKeyConstraint(['id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('chat',
+    op.create_table('events',
     sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('event_type', sa.Enum('PUBLIC', 'FRIENDS', 'PRIVATE', name='eventtype'), nullable=True),
+    sa.Column('description', sa.String(), nullable=False),
+    sa.Column('date_started', sa.DateTime(), nullable=False),
+    sa.Column('date_end', sa.DateTime(), nullable=False),
+    sa.Column('date_creation', sa.DateTime(), nullable=False),
+    sa.Column('user_creator', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('longitud', sa.Float(), nullable=False),
+    sa.Column('latitude', sa.Float(), nullable=False),
+    sa.Column('max_participants', sa.Integer(), nullable=False),
+    sa.Column('chat_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('is_event_free', sa.Boolean(), nullable=True),
+    sa.Column('amount_event', sa.Float(), nullable=False),
+    sa.ForeignKeyConstraint(['chat_id'], ['chat.id'], ),
+    sa.ForeignKeyConstraint(['user_creator'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('members',
+    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('chat_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('joined_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['chat_id'], ['chat.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('user_id', 'chat_id')
+    )
+    op.create_table('message',
+    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('sender_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('chat_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('text', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['chat_id'], ['chat.id'], ),
+    sa.ForeignKeyConstraint(['sender_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('banned_events',
     sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('creador_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('participant_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.ForeignKeyConstraint(['creador_id'], ['users.id'], ),
+    sa.Column('date', sa.DateTime(), nullable=False),
+    sa.Column('reason', sa.String(), nullable=True),
+    sa.Column('id_admin', postgresql.UUID(as_uuid=True), nullable=False),
     sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
-    sa.ForeignKeyConstraint(['participant_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['id_admin'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('event_id')
+    )
+    op.create_table('event_images',
+    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('event_image_uri', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('event_posts',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('parent_post_id', sa.Integer(), nullable=True),
+    sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('datetime', sa.DateTime(), nullable=False),
+    sa.Column('text', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
+    sa.ForeignKeyConstraint(['parent_post_id'], ['event_posts.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('likes',
@@ -172,9 +241,31 @@ def upgrade():
     op.create_table('participant',
     sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('verification_code', sa.String(), nullable=False),
+    sa.Column('time_verified', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('event_id', 'user_id')
+    )
+    op.create_table('payments',
+    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('payment_type', sa.String(), nullable=False),
+    sa.Column('payment_id', sa.String(), nullable=False),
+    sa.Column('amount', sa.Float(), nullable=False),
+    sa.Column('status', sa.Enum('NOT_PAID', 'PAID', name='paymentstatus'), nullable=False),
+    sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('reported_event',
+    sa.Column('id_user', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id_event_reported', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('comment', sa.String(length=1000), nullable=False),
+    sa.ForeignKeyConstraint(['id_event_reported'], ['events.id'], ),
+    sa.ForeignKeyConstraint(['id_user'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id_user', 'id_event_reported')
     )
     op.create_table('review',
     sa.Column('event_id', postgresql.UUID(as_uuid=True), nullable=False),
@@ -185,14 +276,18 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('event_id', 'user_id')
     )
-    op.create_table('message',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('sender_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('chat_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('text', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['chat_id'], ['chat.id'], ),
-    sa.ForeignKeyConstraint(['sender_id'], ['users.id'], ),
+    op.create_table('likes_post',
+    sa.Column('post_id', sa.Integer(), nullable=False),
+    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.ForeignKeyConstraint(['post_id'], ['event_posts.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('post_id', 'user_id')
+    )
+    op.create_table('post_images',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('post_id', sa.Integer(), nullable=True),
+    sa.Column('post_image_uri', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['post_id'], ['event_posts.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
@@ -200,18 +295,29 @@ def upgrade():
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_table('message')
+    op.drop_table('post_images')
+    op.drop_table('likes_post')
     op.drop_table('review')
+    op.drop_table('reported_event')
+    op.drop_table('payments')
     op.drop_table('participant')
     op.drop_table('likes')
-    op.drop_table('chat')
+    op.drop_table('event_posts')
+    op.drop_table('event_images')
+    op.drop_table('banned_events')
+    op.drop_table('message')
+    op.drop_table('members')
+    op.drop_table('events')
     op.drop_table('vajuntos_auth')
     op.drop_table('user_lang')
+    op.drop_table('reported_user')
+    op.drop_table('premium_expiration')
     op.drop_table('google_auth')
     op.drop_table('friends')
     op.drop_table('friend_invites')
     op.drop_table('facebook_auth')
-    op.drop_table('events')
+    op.drop_table('chat')
+    op.drop_table('banned_users')
     op.drop_table('air_quality_data')
     op.drop_table('admin')
     op.drop_table('achievement_progress')
@@ -219,7 +325,6 @@ def downgrade():
     op.drop_table('tri_cache')
     op.drop_table('pollutant')
     op.drop_table('email_verification')
-    op.drop_table('banned_emails')
     op.drop_table('air_quality_station')
     op.drop_table('achievements')
     # ### end Alembic commands ###

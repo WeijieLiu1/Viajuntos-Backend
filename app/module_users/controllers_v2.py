@@ -4,16 +4,19 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 import os
 import uuid
 
+import sqlalchemy
+
 # Import the database object from the main app module
 from app import db
 
 # Import util functions
+from app.module_admin.models import ReportedUser
 from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength
 from app.module_chat.models import Chat
 from app.module_chat.controllers import crear_private_chat
 # Import module models
-from app.module_users.models import FriendInvite, User, Achievement, AchievementProgress, Friend, UserLanguage, EmailVerificationPendant, ViajuntosAuth
+from app.module_users.models import BannedUsers, FriendInvite, User, Achievement, AchievementProgress, Friend, UserLanguage, EmailVerificationPendant, ViajuntosAuth
 
 # Import the hashing object from the main app module
 from app import hashing
@@ -30,6 +33,8 @@ module_users_v2 = Blueprint('users_v2', __name__, url_prefix='/v2/users')
 @jwt_required(optional=True)
 def get_profile(id):
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     is_authenticated_id = id == auth_id
     try:
         user_id = uuid.UUID(id)
@@ -59,7 +64,8 @@ def send_password_reset_code():
         return jsonify({'error_message': 'Must indicate an email'}), 400
     email = request.args['email']
     user_id = user_id_for_email(email)
-
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if user_id == None:
         return jsonify({'action': 'error', 'error_message': 'No user found for this email'}), 404
 
@@ -93,6 +99,8 @@ def reset_forgotten_password():
         return jsonify({'error_message': 'Verification code attribute missing in json'}), 400 
 
     email = request.json['email']
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This email is banned'}), 409
     pw = request.json['password']
     verification = request.json['verification']
     user_id = user_id_for_email(email)
@@ -132,7 +140,8 @@ def reset_forgotten_password():
 @jwt_required(optional=False)
 def request_new_friend_link():
     auth_id = uuid.UUID(get_jwt_identity())
-
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     user_invites = FriendInvite.query.filter_by(invitee = auth_id).filter(FriendInvite.expires_at > datetime.now(timezone.utc)).all()
     if len(user_invites) >= 5:
         return jsonify({'error_message': f'You already have {len(user_invites)} invitation links active.'}), 409
@@ -157,11 +166,13 @@ def accept_friend_link():
     code = request.args['code']
 
     auth_id = uuid.UUID(get_jwt_identity())
-    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     invitation = FriendInvite.query.filter_by(code = code).filter(FriendInvite.expires_at > datetime.now(timezone.utc)).first()
     if invitation == None:
         return jsonify({"error_message": "Code does not exist or it has expired"}), 404
-    
+    if BannedUsers.exists_user(invitation.invitee):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if invitation.invitee == auth_id:
         return jsonify({"error_message": "Can't add yourself as your frind, but you dou have high self esteem."}), 400
     
@@ -178,3 +189,34 @@ def accept_friend_link():
 
     invitation.delete()
     return get_profile(str(invitation.invitee))
+
+
+@module_users_v2.route('/<id>/report/', methods=['POST'])
+@jwt_required(optional=False)
+def report_user(id): 
+    try:
+        auth_id = uuid.UUID(get_jwt_identity())
+        if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
+        try:
+            user_id = uuid.UUID(id)
+        except:
+            return jsonify({"error_message": "user_id isn't a valid UUID"}), 400
+        user = User.query.filter_by(user_id)
+        if user is None:
+            return jsonify({"error_message": f"User {user_id} doesn't exist"}), 400
+        if BannedUsers.exists_user(user_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
+        
+        if "comment" not in request.json:
+            return jsonify({"error_message": "comment is not in the body"}), 400
+        new_report = ReportedUser(id_user=auth_id, id_user_reported=user_id, comment=request.json['comment'])
+        try:
+            new_report.save()
+        except sqlalchemy.exc.IntegrityError:
+            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+        except:
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+        return new_report.toJSON(), 201
+    except:
+        return jsonify({"error_message": "Unexpected error"}), 400 

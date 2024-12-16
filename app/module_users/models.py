@@ -366,22 +366,27 @@ class UserLanguage(db.Model):
         db.session.add(self)
         db.session.commit()
 
-class BannedEmails(db.Model):
-    __tablename__ = 'banned_emails'
-
-    email = db.Column(db.String, primary_key=True)
+class BannedUsers(db.Model):
+    __tablename__ = 'banned_users'
+    
+    email = db.Column(db.String, nullable=False, primary_key=True)
+    id_user = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), default=uuid.uuid4())
     username = db.Column(db.String, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
     reason = db.Column(db.String)
+    #admin who banned the user
+    id_admin = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), nullable=False)
 
-    def __init__(self, email, username, date, reason):
+    def __init__(self, id_user, email, username, date, reason,id_admin):
+        self.id_user = id_user
         self.email = email
         self.username = username
         self.date = date
         self.reason = reason
+        self.id_admin = id_admin
     
     def __repr__(self):
-        return f'BannedEmail({self.email}, {self.username}, {self.date}, {self.reason})'
+        return f'BannedUsers({self.id_user}, {self.email}, {self.username}, {self.date}, {self.reason}, {self.id_admin})'
     
     # To DELETE a row from the table
     def delete(self):
@@ -394,13 +399,17 @@ class BannedEmails(db.Model):
         db.session.commit()
     
     @staticmethod
-    def exists(email):
-        return BannedEmails.query.filter_by(email = email).first() != None
-    
+    def exists_user(id_user):
+        return BannedUsers.query.filter_by(id_user = id_user).first() != None
+    @staticmethod
+    def exists_email(email):
+        return BannedUsers.query.filter_by(email = email).first() != None
     def toJSON(self):
         return {
+            'id_user': self.id_user,
             'email': self.email,
             'username': self.username,
             'date': self.date,
-            'reason': self.reason
+            'reason': self.reason,
+            'id_admin': self.id_admin
         }

@@ -4,7 +4,7 @@ import sqlalchemy
 from app.module_chat.models import Message, Chat, Members
 from app.module_event.models import Event, EventImages
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from app.module_users.models import User
+from app.module_users.models import BannedUsers, User
 import uuid, ipdb
 from flask import Blueprint, jsonify, request
 
@@ -87,6 +87,9 @@ def crear_public_chat(chat_name, creator_id, chat_members):
 @module_chat_v1.route('/add_member', methods=['POST'])
 @jwt_required(optional=False)
 def add_member(id_chat,id_new_member):
+    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try: 
         args = request.json
     except:
@@ -98,6 +101,9 @@ def add_member(id_chat,id_new_member):
 
     Chat_buscado= Chat.query.filter_by(id = id_chat).first()
     auth_id = uuid.UUID(get_jwt_identity())
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if Chat_buscado == None:
         return jsonify({'error_message': 'No such chat.'}), 404
     if Chat_buscado.type == "private":
@@ -164,6 +170,9 @@ def remove_member(id_chat,id_member):
 
     Chat_buscado= Chat.query.filter_by(id = id_chat).first()
     auth_id = uuid.UUID(get_jwt_identity())
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if Chat_buscado == None:
         return jsonify({'error_message': 'No such chat.'}), 404
     if Chat_buscado.type == "private":
@@ -181,6 +190,9 @@ def remove_member(id_chat,id_member):
 @module_chat_v1.route('/all_members/<id_chat>', methods=['GET'])
 @jwt_required(optional=False)
 def get_chat_members(id_chat):
+    auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try:
         members = Members.query.filter_by(chat_id = id_chat)
         users = []
@@ -202,6 +214,8 @@ def get_chat_members(id_chat):
 def create_message():
 
     auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try: 
         args = request.json
     except:
@@ -281,6 +295,8 @@ def create_message_back(auth_id, chat_id, text):
 def borrar_mensaje(id_message):
     
     auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try: 
         args = request.json
     except:
@@ -372,6 +388,9 @@ def borrar_mensajes_usuario_chat(id_chat, id_usuario):
     # -400: Un objeto JSON con los posibles mensajes de error, id no valida o usuario no existe
 @jwt_required(optional=False)
 def get_user_chats(id):
+    auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try: 
         user_id = uuid.UUID(id)
     except:
@@ -427,6 +446,8 @@ def get_chat_messages(chat_id):
         auth_id = uuid.UUID(get_jwt_identity())
     except:
         return jsonify({"error_message": "The user id isn't a valid uuid"}), 400
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try:
         Chat_buscat= Chat.query.filter_by(id = chat_id).first()
     except:
@@ -464,7 +485,8 @@ def get_chat_messages(chat_id):
 def get_chat_image_url(id):
 
     auth_id = uuid.UUID(get_jwt_identity())
-
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
 
     Chat_id = uuid.UUID(id)
     try:

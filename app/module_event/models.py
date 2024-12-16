@@ -7,6 +7,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 import uuid
 
+from app.module_users.models import User
+
 class EventType(Enum):
     PUBLIC = 0
     FRIENDS = 1
@@ -534,7 +536,37 @@ class LikePost(db.Model):
             "user_id": self.user_id,
             "post_id": self.post_id
         }
+# class BannedEvents(db.Model):
+#     __tablename__ = 'banned_events'
 
+#     event_id = db.Column(UUID(as_uuid=True), db.ForeignKey('events.id'), primary_key=True)
+#     date = db.Column(db.DateTime, nullable=False)
+#     reason = db.Column(db.String)
+
+#     def __init__(self, event_id, date, reason):
+#         self.event_id = event_id
+#         self.date = date
+#         self.reason = reason
+    
+#     def __repr__(self):
+#         return f'BannedEmail({self.event_id}, {self.date}, {self.reason})'
+    
+#     # To DELETE a row from the table
+#     def delete(self):
+#         db.session.delete(self)
+#         db.session.commit()
+    
+#     # To SAVE a row from the table
+#     def save(self):
+#         db.session.add(self)
+#         db.session.commit()
+    
+#     def toJSON(self):
+#         return {
+#             'event_id': self.event_id,
+#             'date': self.date,
+#             'reason': self.reason
+#         }
 # # Define Event Fee model
 # class EventFee(db.Model):
 
@@ -587,3 +619,39 @@ class LikePost(db.Model):
 #             "price": self.price,
 #             "date": self.date
 #         }
+    
+class BannedEvents(db.Model):
+    __tablename__ = 'banned_events'
+
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey('events.id'), primary_key=True)
+    date = db.Column(db.DateTime, nullable=False)
+    reason = db.Column(db.String)
+    #admin who banned the user
+    id_admin = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), nullable=False)
+
+    def __init__(self, event_id, date, reason,id_admin):
+        self.event_id = event_id
+        self.date = date
+        self.reason = reason
+        self.id_admin = id_admin
+    
+    def __repr__(self):
+        return f'BannedEvents({self.event_id}, {self.date}, {self.reason},{self.id_admin})'
+    
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+    
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+    
+    def toJSON(self):
+        return {
+            'event_id': self.event_id,
+            'date': self.date,
+            'reason': self.reason,
+            'id_admin': self.id_admin
+        }

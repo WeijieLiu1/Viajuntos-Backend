@@ -2,9 +2,9 @@
 # Import module models (i.e. User)
 import os
 import sqlalchemy
-from app.module_event.models import Event, EventImages, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
-from app.module_users.models import Friend, User, GoogleAuth
-from app.module_admin.models import Admin
+from app.module_event.models import BannedEvents, Event, EventImages, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
+from app.module_users.models import BannedUsers, Friend, User, GoogleAuth
+from app.module_admin.models import Admin, ReportedEvent
 from app.module_airservice.controllers import general_quality_at_a_point
 from app.module_users.utils import increment_achievement_of_user
 
@@ -46,6 +46,10 @@ module_event_v3 = Blueprint('event_v3', __name__, url_prefix='/v3/events')
 @module_event_v3.route('/', methods=['POST'])
 @jwt_required(optional=True)  # cambio esto y lo pongo en True
 def create_event():
+    
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.json
         #args.noauth_local_webserver = True
@@ -79,7 +83,6 @@ def create_event():
     elif(event_type == "PRIVATE"):
         enum_type = EventType.PRIVATE
   # restricion: solo puedes crear eventos para tu usuario (mirando Bearer Token)
-    auth_id = get_jwt_identity()
     if str(user_creator) != auth_id:
         return jsonify({"error_message": "Un usuario no puede crear un evento por otra persona"}), 403
     try:
@@ -112,7 +115,7 @@ def create_event():
             return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
 
     # Añadir el creador al evento como participante
-    participant = Participant(event.id, user_creator)
+    participant = Participant(event.id, user_creator, "thecreator")
 
     # Si es el primer evento que crea, darle el noob host
     # increment_achievement_of_user("noob_host", user_creator)
@@ -147,6 +150,9 @@ def create_event():
 @module_event_v3.route('/<id>', methods=['PUT'])
 @jwt_required(optional=False)
 def modify_events_v2(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event_id = uuid.UUID(id)
     except:
@@ -177,7 +183,6 @@ def modify_events_v2(id):
         return jsonify({"error_message": "solo el usuario creador puede modificar su evento"}), 400
 
     # restricion: solo el usuario creador puede modificar su evento (mirando Bearer Token)
-    auth_id = get_jwt_identity()
     if str(event.user_creator) != auth_id:
         return jsonify({"error_message": "A user cannot update the events of others"}), 403
 
@@ -342,6 +347,9 @@ def check_atributes(args, type):
 @module_event_v3.route('/<id>/join', methods=['POST'])
 @jwt_required(optional=False)
 def join_event(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event_id = uuid.UUID(id)
     except:
@@ -365,7 +373,6 @@ def join_event(id):
     except:
         return jsonify({"error_message": f"la user_id no es una UUID valida"}), 400
 
-    auth_id = get_jwt_identity()
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user cannot join a event for others"}), 403
 
@@ -436,6 +443,9 @@ def join_event(id):
 @module_event_v3.route('/<id>/leave', methods=['POST'])
 @jwt_required(optional=False)
 def leave_event(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event_id = uuid.UUID(id)
     except:
@@ -460,7 +470,6 @@ def leave_event(id):
         return jsonify({"error_message": f"la user_id no es una UUID valida"}), 400
 
     # restriccion: Un usuario no puede abandonar un evento por otro
-    auth_id = get_jwt_identity()
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user cannot leave a event for others"}), 403
 
@@ -509,6 +518,9 @@ def leave_event(id):
 # - 200: Un objeto JSON con los eventos a los que se a unido
 @jwt_required(optional=False)
 def get_user_joins(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         user_id = uuid.UUID(id)
     except:
@@ -540,6 +552,9 @@ def get_user_joins(id):
 # - 201: Un objeto JSON con TODOS los parametros del evento con la id de la request
 @jwt_required(optional=False)
 def get_event(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event_id = uuid.UUID(id)
     except:
@@ -573,6 +588,9 @@ def get_event(id):
 # - 201: Un objeto JSON con TODOS los parametros del evento con la id de la request
 @jwt_required(optional=False)
 def get_creations():
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.args
     except:
@@ -616,6 +634,9 @@ def get_creations():
 # - 200: Un objeto JSON confirmando que se ha eliminado correctamente
 @jwt_required(optional=False)
 def delete_event(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event_id = uuid.UUID(id)
     except:
@@ -630,7 +651,6 @@ def delete_event(id):
         return jsonify({"error_message": f"The event {event_id} doesn't exist"}), 400
 
     # restricion: solo el usuario creador puede eliminar su evento (o un admin) (mirando Bearer Token)
-    auth_id = get_jwt_identity()
     if str(event.user_creator) != auth_id and not Admin.exists(auth_id):
         return jsonify({"error_message": "A user cannot delete events if they are not the creator"}), 403
 
@@ -696,13 +716,16 @@ def delete_event(id):
 # - 201: Un objeto JSON con todos los eventos activos que hay en el sistema
 @jwt_required(optional=False)
 def get_all_events():
+    user_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(user_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         # La data de ahora es en GMT+2 por lo tanto tenemos que sumar dos horas en el tiempo actual
         current_date = datetime.now() + timedelta(hours=2)
         active_events = Event.query.filter(Event.date_end >= current_date)
     except:
         return jsonify({"error_message": "Error when querying events"}), 400
-    user_id = uuid.UUID(get_jwt_identity())
+    
     filtered_events = []
 
     for event in active_events:
@@ -732,6 +755,9 @@ def get_all_events():
 @module_event_v3.route('/filter', methods=['GET'])
 @jwt_required(optional=False)
 def filter_by():
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.json
     except:
@@ -780,6 +806,10 @@ def filter_by():
 @module_event_v3.route('/lastten', methods=['GET'])
 @jwt_required(optional=False)
 def lastest_events():
+    user_id = uuid.UUID(get_jwt_identity())
+    
+    if BannedUsers.exists_user(user_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         # La data de ahora es en GMT+2 por lo tanto tenemos que sumar dos horas en el tiempo actual
         current_date = datetime.now() + timedelta(hours=2)
@@ -787,6 +817,9 @@ def lastest_events():
     except:
         return {"error_message": "Error while querying events"}
     user_id = uuid.UUID(get_jwt_identity())
+    
+    if BannedUsers.exists_user(user_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     lastten = []
     i = 0
     for event in lasts_events:
@@ -813,6 +846,9 @@ def lastest_events():
 @module_event_v3.route('/participants', methods=['GET'])
 @jwt_required(optional=False)
 def who_joined_event():
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.args
     except:
@@ -880,6 +916,8 @@ def get_past_evento():
 
     # restricion: solo el usuario creador puede eliminar su evento (mirando Bearer Token)
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user cannot see the events that another user participated in"}), 403
 
@@ -953,6 +991,8 @@ def create_like(id):
 
     # Un usuario solo puede dar like por si mismo
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user can't like for others"}), 403
 
@@ -999,6 +1039,8 @@ def delete_like(id):
         return jsonify({"error_message": "User_id isn't a valid UUID"}), 400
 
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if str(delete_user_id) != auth_id:
         return jsonify({"error_message": "A user can't remove likes for others"}), 403
 
@@ -1036,6 +1078,9 @@ def get_likes_by_user(iduser):
 
     # No todos los usuarios pueden conseguir esta info (ESTO YA MIRA SI EL USUARIO EXISTE O NO, PQ LO COMPARA CON EL TOKEN QUE ES UN USUARIO QUE EXISTE SEGURO)
     auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user can't get the likes of the events of someone else"}), 403
 
@@ -1065,6 +1110,9 @@ def get_likes_by_user(iduser):
 # - 200: Un objeto JSON confirmando que se ha eliminado correctamente
 @jwt_required(optional=False)
 def get_likes_from_user(iduser, idevento):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         user_id_q = uuid.UUID(iduser)
     except:
@@ -1102,6 +1150,9 @@ def get_likes_from_user(iduser, idevento):
 # - 200: Un objeto JSON con los top 10 eventos con mas likes
 @jwt_required(optional=False)
 def get_top_ten_events():
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
     engine = create_engine(db_uri)
     sql_query = db.text("select e.id, e.name, e.description, e.date_started, e.date_end, e.date_creation, e.user_creator, e.longitud, e.latitude, e.max_participants, e.is_event_free from events e left join likes l on e.id = l.event_id where e.date_end >= CURRENT_TIMESTAMP group by e.id order by count(distinct l.user_id) desc;")
@@ -1192,6 +1243,9 @@ def crear_review():
 
     # restriccion 3: Un usuario no puede dar una review por otra persona (por extra seguridad). Tmb implicitamente comprovamos si el usuario existe
     auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if str(user_id) != auth_id:
         return jsonify({"error_message": "A user can't create a review for others"}), 403
 
@@ -1255,6 +1309,9 @@ def crear_review():
 # - 200: Un objeto JSON con los atributos de la review creada
 @jwt_required(optional=False)
 def get_reviews_evento():  
+    auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.args
     except:
@@ -1308,6 +1365,9 @@ def add_payment():
         return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
     
     auth_id = uuid.UUID(get_jwt_identity())
+    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if(auth_id == event.user_creator):
         return jsonify({"error_message": f"User {auth_id} is the creator of the event"}), 400
     if "amount" not in request.json:
@@ -1349,11 +1409,12 @@ def get_payment(id):
         event_id = uuid.UUID(id)
     except:
         return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
-    # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
     try:
         auth_id = uuid.UUID(get_jwt_identity())
     except:
         return jsonify({"error_message": "auth_id isn't a valid UUID"}), 400
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     aux_payment = Payment.query.filter_by(
         event_id=event_id, user_id=auth_id,status=PaymentStatus.PAID).first()
     if aux_payment is None:
@@ -1368,19 +1429,20 @@ def get_payment(id):
 # - 200: Un objeto JSON con los atributos de la review creada
 @jwt_required(optional=False)
 def get_all_payments(id):  
-    
     try:
         event_id = uuid.UUID(id)
     except:
         return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
-    # restriccion: el evento tiene que estar en la URL, ser una UUID valida y ha de existir
-    # try:
-    #     auth_id = uuid.UUID(get_jwt_identity())
-    # except:
-    #     return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
-    # event = Event.query.get(id)
-    # if(auth_id != event.user_creator):
-    #     return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
+    try:
+        auth_id = uuid.UUID(get_jwt_identity())
+    except:
+        return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
+    event = Event.query.get(id)
+    if(auth_id != event.user_creator):
+        return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
     
     aux_payments = Payment.query.filter_by(
         event_id=event_id, status = PaymentStatus.PAID).all()
@@ -1426,7 +1488,8 @@ def post_a_post(id):
             return jsonify({"error_message": "Mira el JSON body de la request, hay un atributo mal definido"}), 400
         
         auth_id = uuid.UUID(get_jwt_identity())
-
+        if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
         if args.get("parent_post_id") is None:
             return jsonify({"error_message": "parent_post_id is invalid"}), 400
         if args.get("text") is None:
@@ -1476,6 +1539,8 @@ def put_like_post(id,post_id):
         return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
 
     user_id = get_jwt_identity()
+    if BannedUsers.exists_user(user_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     user = User.query.get(user_id)
     if user is None:
         return jsonify({"error_message": f"User {user_id} doesn't exist"}), 400
@@ -1498,6 +1563,52 @@ def put_like_post(id,post_id):
         except:
             return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
         return jsonify({"message": "Successful create like"}), 200
+    
+
+# SABER SI USUARIO HA DADO LIKE A UN EVENTO method: saber si un usuario ha dado like a un evento
+@module_event_v3.route('/<iduser>/likepost/<idevent>/<idpost>', methods=['GET'])
+# RECIBE:
+# - GET HTTP request con la id del usuario que queremos consultar
+# DEVUELVE:
+# - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
+# - 200: Un objeto JSON confirmando que se ha eliminado correctamente
+@jwt_required(optional=False)
+def get_likes_post_from_user(iduser, idevent, idpost):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
+    try:
+        user_id_q = uuid.UUID(iduser)
+    except:
+        return jsonify({"error_message": "User_id isn't a valid UUID"}), 400
+
+    user = User.query.get(user_id_q)
+    if user is None:
+        return jsonify({"error_message": f"User {user_id_q} doesn't exist"}), 400
+
+    try:
+        event_id_q = uuid.UUID(idevent)
+    except:
+        return jsonify({"error_message": "Event_id isn't a valid UUID"}), 400
+    event = Event.query.get(event_id_q)
+    if event is None:
+        return jsonify({"error_message": f"Event {event_id_q} doesn't exist"}), 400
+    
+    post = EventPosts.query.filter_by(id = idpost,event_id = event_id_q)
+    if post is None:
+        return jsonify({"error_message": f"Post {idpost} doesn't exist"}), 400
+
+    try:
+        liked = LikePost.query.filter_by(
+            user_id=user_id_q, post_id=idpost).first()
+    except:
+        return jsonify({"error_message": "Error while querying Like"}), 400
+
+    if liked is None:
+        return jsonify({"message": "No le ha dado like"}), 200
+    else:
+        return jsonify({"message": "Le ha dado like"}), 200
+
 
 ########################################################################### REGISTER ########################################################
 
@@ -1506,6 +1617,8 @@ def put_like_post(id,post_id):
 @jwt_required(optional=False)
 def get_verification_code(id):
     auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     participant = Participant.query.filter_by(event_id=id, user_id=auth_id).first()
     if participant is None:
         return jsonify({"error_message": "You are not participant of this event"}), 400
@@ -1518,6 +1631,8 @@ def get_verification_code(id):
 @jwt_required(optional=False)
 def get_verify_event(id):
     auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     event = Event.query.get(id)
     msg = ""
     if event is None:
@@ -1546,5 +1661,32 @@ def get_verify_event(id):
     return jsonify({"message": msg}), 200
 
 
-
-
+@module_event_v3.route('/<id>/report/', methods=['Post'])
+@jwt_required(optional=False)
+def report_event(id): 
+    try:
+        auth_id = uuid.UUID(get_jwt_identity())
+        if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
+        try:
+            event_id = uuid.UUID(id)
+        except:
+            return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
+        event = Event.query.filter_by(event_id)
+        if event is None:
+            return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
+        if BannedEvents.query.filter_by(event_id=event_id).first() is not None:
+            return jsonify({"error_message": "Event is already banned"}), 400
+        
+        if "comment" not in request.json:
+            return jsonify({"error_message": "comment is not in the body"}), 400
+        new_report = ReportedEvent(id_user=auth_id, id_event_reported=event_id, comment=request.json['comment'])
+        try:
+            new_report.save()
+        except sqlalchemy.exc.IntegrityError:
+            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+        except:
+            return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
+        return new_report.toJSON(), 201
+    except:
+        return jsonify({"error_message": "Unexpected error"}), 400 

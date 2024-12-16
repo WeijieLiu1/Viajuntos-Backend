@@ -20,7 +20,7 @@ from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength,EmailVerificationPendant
 
 # Import module models
-from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedEmails
+from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedUsers, premium_expiration
 from app.module_admin.models import Admin
 from app.module_chat.models import Message, Chat
 from app.module_event.models import Like, Participant
@@ -37,6 +37,9 @@ module_users_v1 = Blueprint('users', __name__, url_prefix='/v1/users')
 def get_profile(id):
     auth_id = get_jwt_identity()
     is_authenticated_id = id == auth_id
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This User is banned'}), 409
     try:
         user_id = uuid.UUID(id)
     except:
@@ -59,7 +62,8 @@ def update_profile(id):
     auth_id = get_jwt_identity()
     if id != auth_id:
         return jsonify({'error_message': 'Only the owner of the profile can update it'}), 403
-    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This User is banned'}), 409
     if 'username' not in request.json:
         return jsonify({'error_message': 'Username attribute missing in json'}), 400
     if 'description' not in request.json:
@@ -124,15 +128,38 @@ def update_profile(id):
 
     return jsonify(profile), 200
 
-@module_users_v1.route('/<id>', methods=['PUT'])
+@module_users_v1.route('/<id>/update_premium', methods=['POST'])
 @jwt_required(optional=False)
 def purchase_premium(id):
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if id != auth_id:
         return jsonify({'error_message': 'Only the owner of the profile can update it'}), 403
-    
-    
-    return jsonify({'message': 'Premuim purchase succeeded'}), 200
+    pre_exp = premium_expiration.query.filter_by(user = auth_id).first()
+    if pre_exp is None:
+        new_premium_expiration = premium_expiration(auth_id,datetime.now()+ timedelta(days=365))
+        new_premium_expiration.save()
+        return jsonify({'message': 'Premuim actived'}), 200
+    else:
+        pre_exp.delete()
+        return jsonify({'message': 'Premuim desactived'}), 200
+
+@module_users_v1.route('/<id>/get_premium', methods=['GET'])
+@jwt_required(optional=False)
+def get_premium(id):
+    auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
+    if id != auth_id:
+        return jsonify({'error_message': 'Only the owner of the profile can update it'}), 403
+    pre_exp = premium_expiration.query.filter_by(user = auth_id).first()
+    if pre_exp is None:
+        return jsonify({'message': 'User is not Premium'}), 200
+    else:        
+        if pre_exp.expiration_at < datetime.now():
+            return jsonify({'message': 'User is not Premium'}), 200
+        return jsonify({'message': 'User is Premium'}), 200
 
 @module_users_v1.route('/<id>/pw', methods=['POST'])
 @jwt_required(optional=False)
@@ -151,6 +178,8 @@ def change_password(id):
     if pw_status != 200: return pw_msg, pw_status
 
     auth_id = get_jwt_identity()
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if id != auth_id:
         return jsonify({'error_message': 'Only the owner of the account can change its password'}), 403
     viajuntos_auth = ViajuntosAuth.query.filter_by(id = uuid.UUID(id)).first()
@@ -194,8 +223,8 @@ def check_register_status_viajuntos(args):
     if 'email' not in args:
         return jsonify({'error_message': 'Viajuntos auth method must indicate an email'}), 400
     email = args['email']
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists_email(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user_id = user_id_for_email(email)
     if user_id == None:
         send_verification_code_to(email)
@@ -218,8 +247,8 @@ def check_register_status_google(args):
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Google token was invalid'}), 400
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user_id = user_id_for_email(email)
     if user_id == None:
         return jsonify({'action': 'continue'}), 200
@@ -239,8 +268,8 @@ def check_register_status_facebook(args):
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Facebook token was invalid'}), 400
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user_id = user_id_for_email(email)
     if user_id == None:
         return jsonify({'action': 'continue'}), 200
@@ -279,8 +308,8 @@ def register_viajuntos():
         
         return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
 
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists_email(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     # Check no other user exists with that email
     if user_id_for_email(email) != None:
         return jsonify({'error_message': 'User with this email already exists'}), 400
@@ -358,8 +387,8 @@ def register_google():
     except:
         return jsonify({'error_message': 'Google token was invalid'}), 400
     
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     
     # Check no other user exists with that email
     if user_id_for_email(email) != None:
@@ -427,8 +456,8 @@ def register_facebook():
     except:
         return jsonify({'error_message': 'Google token was invalid'}), 400
     
-    if BannedEmails.exists(email):
-        return jsonify({'error_message': 'This email is banned'}), 409
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     
     # Check no other user exists with that email
     if user_id_for_email(email) != None:
@@ -475,6 +504,9 @@ def check_login_status():
     if 'type' not in request.args:
         return jsonify({'error_message': 'Must indicate type of authentication to check {viajuntos, google, facebook}'}), 400
     type = request.args['type']
+    email = request.args['email']
+    if BannedUsers.exists_email(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     if type == 'viajuntos':
         return check_login_status_viajuntos(request.args)
     if type == 'google':
@@ -544,6 +576,8 @@ def login_viajuntos():
     email = request.json['email']
     password = request.json['password']
     user = User.query.filter_by(email = email).first()
+    if BannedUsers.exists_email(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     if user == None:
         return jsonify({'error_message': 'Email or password are wrong.'}), 400 
     viajuntos_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
@@ -565,6 +599,9 @@ def login_google():
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Google token was invalid'}), 400
+    
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user = User.query.filter_by(email = email).first()
     if user == None:
         return jsonify({'error_message': 'User does not exist'}), 400 
@@ -586,6 +623,9 @@ def login_facebook():
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Facebook token was invalid'}), 400
+    
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user = User.query.filter_by(email = email).first()
     if user == None:
         return jsonify({'error_message': 'User does not exist'}), 400 
@@ -600,6 +640,9 @@ def login_facebook():
 @jwt_required(refresh=True)
 def refresh():
     identity = get_jwt_identity()
+    
+    if BannedUsers.exists_user(identity):
+        return jsonify({'error_message': 'This User is banned'}), 409
     access_token = create_access_token(identity=identity)
     exp_timestamp = get_jwt()["exp"]
     now = datetime.now(timezone.utc)
@@ -630,6 +673,8 @@ def link_viajuntos_auth_method(args):
     if not ('email' in args and 'password' in args and 'verification' in args):
         return jsonify({'error_message': 'Viajuntos auth method must indicate email, password and verification in credentials'}), 400
     email = args['email']
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     password = args['password']
     verification = args['verification']
     user_id = user_id_for_email(email)
@@ -677,7 +722,8 @@ def link_google_auth_method(args):
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Google token was invalid'}), 400
-
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user_id = user_id_for_email(email)
     # Check user exists
     if user_id == None:
@@ -711,7 +757,8 @@ def link_facebook_auth_method(args):
         email = idinfo.json()['email']
     except:
         return jsonify({'error_message': 'Facebook token was invalid'}), 400
-
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     user_id = user_id_for_email(email)
     # Check user exists
     if user_id == None:
@@ -745,7 +792,8 @@ def delete_account(id):
         user_id = uuid.UUID(id)
     except:
         return jsonify({"error_message": "User_id isn't a valid UUID"}), 400
-    
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
     try:
         user = User.query.get(user_id)
     except:

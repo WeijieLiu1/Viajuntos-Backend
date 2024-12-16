@@ -6,6 +6,7 @@ from flask import (Blueprint, request, jsonify)
 import uuid
 # Import the database object from the main app module
 from app import db
+from app.module_users.models import BannedUsers
 
 # Define the blueprint: 'event', set its url prefix: app.url/event
 module_event_v1 = Blueprint('event', __name__, url_prefix='/v1/events')
@@ -59,6 +60,8 @@ def create_event():
         user_creator = uuid.UUID(args.get("user_creator"))
     except ValueError:
         return jsonify({"error_message": "user_creator isn't a valid UUID"}), 400
+    if BannedUsers.exists_user(user_creator):
+        return jsonify({'error_message': 'This email is banned'}), 409
     if not isinstance(args.get("name"), str):
         return jsonify({"error_message": "name isn't a string!"}), 400 
     if not isinstance(args.get("description"), str):
@@ -122,7 +125,8 @@ def get_event(id):
         user_id = uuid.UUID(id)
     except:
         return jsonify({"error_message": "user_id isn't a valid UUID"}), 400
-
+    if BannedUsers.exists_user(user_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try:
         event = Event.query.filter_by(id = user_id)
         return jsonify(event.toJSON()), 200
@@ -136,7 +140,8 @@ def delete_event(id):
         user_id = uuid.UUID(id)
     except :
         return jsonify({"error_message": "user_id isn't a valid UUID"}), 400
-
+    if BannedUsers.exists_user(user_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try:
         eventb = Event.query.filter_by(id = user_id)
         eventb.delete()

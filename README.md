@@ -69,7 +69,7 @@ Instala el Docker desktop de tu sistema operativo.
 Si trabajas en Windows, tras instalarlo y abrirlo te pedirá que instales WSL2 (Windows Subsystem Linux) que básicamente es una VM de ubuntu que corre en windows.
 Cuando en la ventana de docker, la barrita de abajo a la izquierda con el logo de docker esté en verde, querrá decir que has hecho bien la instalación y puedes continuar.
 
-La primera vez que vayas a ejecutar un contenedor (en este caso el de api):
+La primera vez que vayas a ejecutar un contenedor (en este caso el de api), descaregarà los ficheros necesarios para el docker:
 ```
 $: docker-compose up --build api
 ```
