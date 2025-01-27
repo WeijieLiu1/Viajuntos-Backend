@@ -3,7 +3,7 @@
 import os
 import sqlalchemy
 from app.module_event.models import BannedEvents, Event, EventImages, EventPosts, EventType, LikePost, Participant, Like, Payment, PaymentStatus, PostImages, Review
-from app.module_users.models import BannedUsers, Friend, User, GoogleAuth
+from app.module_users.models import BannedUsers, Friend, User, GoogleAuth,GithubAuth
 from app.module_admin.models import Admin, ReportedEvent
 from app.module_airservice.controllers import general_quality_at_a_point
 from app.module_users.utils import increment_achievement_of_user
@@ -118,7 +118,7 @@ def create_event():
     participant = Participant(event.id, user_creator, "thecreator")
 
     # Si es el primer evento que crea, darle el noob host
-    # increment_achievement_of_user("noob_host", user_creator)
+    increment_achievement_of_user("noob_host", user_creator)
 
     
     try:
@@ -411,8 +411,8 @@ def join_event(id):
     if cont_status == 200:
         # Si es un evento con poca contaminacion, suma achievement Social Bug
         contaminacion = json.loads(cont_level.response[0])
-        if contaminacion["pollution"] < 0.15:
-            increment_achievement_of_user("social_bug",user_id)
+        # if contaminacion["pollution"] < 0.15:
+        #     increment_achievement_of_user("social_bug",user_id)
 
     # Se crea un chat entre el participante y el creador
     err, sts = add_member_back(event.chat_id, user_id)
@@ -564,20 +564,13 @@ def get_event(id):
         event = Event.query.get(event_id)
     except:
         return jsonify({"error_message": f"The event {event_id} doesn't exist"}), 400
-
-    # Si es un evento con contaminacion baja, se añade uno al achievement Healthy Curiosity
-    # cont_level, cont_status = general_quality_at_a_point(event.longitud, event.latitude)
-    # if cont_status == 200:
-    #     # Si es un evento con poca contaminacion, suma achievement Social Bug
-    #     contaminacion = json.loads(cont_level.response[0])
-    #     if contaminacion["pollution"] < 0.15:
-    #         auth_id = get_jwt_identity()
-    #         try:
-    #             increment_achievement_of_user("healthy_curiosity", auth_id)
-    #         except:
-    #             return jsonify({"error_message": f"Error adding an achievement"}), 400
-
-    return jsonify(event.toJSON()), 200
+    creator = User.query.get(event.user_creator)
+    if not creator:
+        return jsonify({"error_message": "Event creator not found"}), 404
+    event_data = event.toJSON()
+    event_data['creator_name'] = creator.username
+    event_data['creator_image_url'] = creator.image_url
+    return jsonify(event_data), 200
 
 
 # OBTENER EVENTOS POR USUARIO CREADOR method: devuelve todos los eventos creados por un usuario
@@ -1286,16 +1279,9 @@ def crear_review():
     except:
         return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
 
-    # Quitar el participante del evento
-    try:
-        participant.delete()
-    except sqlalchemy.exc.IntegrityError:
-        return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD)"}), 400
-    except:
-        return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
 
     # Si es la primera review de un usuario, darle el logro feedback monster
-    increment_achievement_of_user("feedback_monster", user_id)
+    # increment_achievement_of_user("feedback_monster", user_id)
 
     # Devolver nueva review en formato JSON si todo ha funcionado correctamente
     ratingJSON = new_rating.toJSON()
@@ -1441,8 +1427,8 @@ def get_all_payments(id):
     if BannedUsers.exists_user(auth_id):
             return jsonify({'error_message': 'This email is banned'}), 409
     event = Event.query.get(id)
-    if(auth_id != event.user_creator):
-        return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
+    # if(auth_id != event.user_creator):
+    #     return jsonify({"warning_message": f"User {auth_id} is not the creator of the event"}), 200
     
     aux_payments = Payment.query.filter_by(
         event_id=event_id, status = PaymentStatus.PAID).all()
@@ -1661,7 +1647,7 @@ def get_verify_event(id):
     return jsonify({"message": msg}), 200
 
 
-@module_event_v3.route('/<id>/report/', methods=['Post'])
+@module_event_v3.route('/<id>/report/', methods=['POST'])
 @jwt_required(optional=False)
 def report_event(id): 
     try:
@@ -1672,7 +1658,7 @@ def report_event(id):
             event_id = uuid.UUID(id)
         except:
             return jsonify({"error_message": "event_id isn't a valid UUID"}), 400
-        event = Event.query.filter_by(event_id)
+        event = Event.query.filter_by(id=event_id)
         if event is None:
             return jsonify({"error_message": f"Event {event_id} doesn't exist"}), 400
         if BannedEvents.query.filter_by(event_id=event_id).first() is not None:
@@ -1684,7 +1670,7 @@ def report_event(id):
         try:
             new_report.save()
         except sqlalchemy.exc.IntegrityError:
-            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe la payment en la DB"}), 400
+            return jsonify({"error_message": "Integrity error, FK violated (algo no esta definido en la BD) o ya existe el report en la DB"}), 400
         except:
             return jsonify({"error_message": "Error de DB nuevo, cual es?"}), 400
         return new_report.toJSON(), 201

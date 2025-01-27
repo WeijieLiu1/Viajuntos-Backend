@@ -272,6 +272,7 @@ class Review(db.Model):
     rating = db.Column(db.Integer, nullable=False)
     # Comment de una review
     comment = db.Column(db.String, nullable=False)
+    datetime = db.Column(db.DateTime, nullable=True, default=datetime.now())
 
     # To CREATE an instance of a Review
 
@@ -283,7 +284,7 @@ class Review(db.Model):
 
     # To FORMAT a Review in a readable string format
     def __repr__(self):
-        return 'Review(event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', rating: ' + str(self.rating) + ', comment: ' + str(self.comment) + ').'
+        return 'Review(event_id: ' + str(self.event_id) + ', user_id: ' + str(self.user_id) + ', rating: ' + str(self.rating) + ', comment: ' + str(self.comment)+ ', datetime: ' + str(self.datetime) + ').'
 
     # To DELETE a row from the table
     def delete(self):
@@ -306,7 +307,8 @@ class Review(db.Model):
             "event_id": self.event_id,
             "user_id": self.user_id,
             "rating": self.rating,
-            "comment": self.comment
+            "comment": self.comment,
+            "datetime": self.datetime
         }
 
 class FeeType(Enum):

@@ -4,6 +4,8 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
 
+from app.module_chat.models import Chat
+
 # Define a User model
 class User(db.Model):
     __tablename__ = 'users'
@@ -167,6 +169,32 @@ class FacebookAuth(db.Model):
         db.session.add(self)
         db.session.commit()
 
+class GithubAuth(db.Model):
+    __tablename__ = 'github_auth'
+
+    # User id
+    id = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
+    # Github access token
+    access_token = db.Column(db.String, nullable=False)
+
+    # To CREATE an instance of a GithubUser
+    def __init__(self, id, access_token):
+        self.id = id
+        self.access_token = access_token
+
+    def __repr__(self):
+        return f'User({self.id}, {self.access_token})'
+
+    # To DELETE a row from the table
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+    
+    # To SAVE a row from the table
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
 class Achievement(db.Model):
     __tablename__ = 'achievements'
 
@@ -217,6 +245,13 @@ class Achievement(db.Model):
             if progress.progress == achievement.stages:
                 achievement_item['completed_at'] = progress.completed_at
             achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
+            # achievement_list.append(achievement_item)
         return achievement_list
 
 class AchievementProgress(db.Model):
@@ -286,12 +321,15 @@ class Friend(db.Model):
     # Invited id
     invited = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
 
-    def __init__(self, invitee, invited):
+    id_chat = db.Column(UUID(as_uuid=True), db.ForeignKey(Chat.id), default=uuid.uuid4())
+
+    def __init__(self, invitee, invited, id_chat):
         self.invitee = invitee
         self.invited = invited
+        self.id_chat = id_chat
 
     def __repr__(self):
-        return f'Achievement({self.invitee}, {self.invited})'
+        return f'Achievement({self.invitee}, {self.invited}, {self.id_chat})'
 
     # To DELETE a row from the table
     def delete(self):
@@ -315,18 +353,22 @@ class Friend(db.Model):
 
 class FriendInvite(db.Model):
     __tablename__ = 'friend_invites'
+    __table_args__ = (
+        db.CheckConstraint('invitee <> invited'),
+    )
 
-    invitee = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), default=uuid.uuid4(), nullable=False)
-    code = db.Column(db.String, primary_key=True)
+    invitee = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
+    invited = db.Column(UUID(as_uuid=True), db.ForeignKey(User.id), primary_key=True, default=uuid.uuid4())
     expires_at = db.Column(db.DateTime, nullable=False)
+    accepted = db.Column(db.Boolean, nullable=True)
 
-    def __init__(self, invitee, code, expires_at):
+    def __init__(self, invitee, invited, expires_at):
         self.invitee = invitee
-        self.code = code
+        self.invited = invited
         self.expires_at = expires_at
 
     def __repr__(self):
-        return f'FriendInvite({self.invitee}, {self.code}, {self.expires_at})'
+        return f'FriendInvite({self.invitee},{self.invited}, {self.expires_at}, {self.accepted})'
 
     # To DELETE a row from the table
     def delete(self):
@@ -337,6 +379,14 @@ class FriendInvite(db.Model):
     def save(self):
         db.session.add(self)
         db.session.commit()
+
+    def toJSON(self):
+        return {
+            'invitee': self.invitee,
+            'invited': self.invited,
+            'expires_at': self.expires_at,
+            'accepted': self.accepted
+        }
 
 class lang(enum.Enum):
     catalan = "catalan"

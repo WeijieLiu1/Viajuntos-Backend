@@ -12,38 +12,32 @@ from flask import Blueprint, jsonify, request
 module_chat_v1 = Blueprint('chat', __name__, url_prefix= '/v1/chat')
 # create a private chat
 def crear_private_chat(user1_id, user2_id):
+    user1 = User.query.filter_by(id=user1_id).first()
+    if not user1:
+        raise ValueError("User1 does not exist.")
 
-    user1 = User.query.filter_by(id = user1_id).first()
-    if user1 == None:
-        return jsonify({'error_message': 'No such user.'}), 404
-    
-    user2 = User.query.filter_by(id = user2_id).first()
-    if user2 == None:
-        return jsonify({'error_message': 'No such user.'}), 404
-    
-    id = uuid.uuid4()
-    New_Chat = Chat(id, "private", "private", user2_id)
+    user2 = User.query.filter_by(id=user2_id).first()
+    if not user2:
+        raise ValueError("User2 does not exist.")
+
+    chat_id = uuid.uuid4()
+    new_chat = Chat(chat_id, "private", "private", user2_id)
 
     try:
-        New_Chat.save()
-        
-        new_member1 = Members(user1_id, New_Chat.id)
-        try:
-            new_member1.save()
-        except:
-            return jsonify({"error_message": "Something happened in the insert"}), 400
-        
-        new_member2 = Members(user2_id, New_Chat.id)
-        try:
-            new_member2.save()
-        except:
-            return jsonify({"error_message": "Something happened in the insert"}), 400
+        new_chat.save()
+
+        new_member1 = Members(user1_id, new_chat.id)
+        new_member1.save()
+
+        new_member2 = Members(user2_id, new_chat.id)
+        new_member2.save()
+
     except sqlalchemy.exc.IntegrityError:
-       return jsonify({"error_message": "FK problems, the user or the event doesn't exists"}), 400
-    except:
-        return jsonify({"error_message": "Something happened in the insert"}), 400
-    
-    return jsonify([New_Chat.toJSON()]), 201
+        raise ValueError("Foreign key constraint failed: invalid user or event.")
+    except Exception as e:
+        raise RuntimeError(f"An unexpected error occurred: {str(e)}")
+
+    return new_chat.id
 
 def borrar_chat(chat_id):
     try:

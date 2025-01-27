@@ -20,7 +20,7 @@ from app.utils.email import send_email
 from app.module_users.utils import increment_achievement_of_user, user_id_for_email, authentication_methods_for_user_id, send_verification_code_to, generate_tokens, get_random_salt, verify_password_strength,EmailVerificationPendant
 
 # Import module models
-from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth, EmailVerificationPendant, Friend, UserLanguage, BannedUsers, premium_expiration
+from app.module_users.models import AchievementProgress, FriendInvite, User, ViajuntosAuth, GoogleAuth, FacebookAuth,GithubAuth, EmailVerificationPendant, Friend, UserLanguage, BannedUsers, premium_expiration
 from app.module_admin.models import Admin
 from app.module_chat.models import Message, Chat
 from app.module_event.models import Like, Participant
@@ -74,13 +74,16 @@ def update_profile(id):
         return jsonify({'error_message': 'Hobbies list attribute missing in json'}), 400
     if 'image_url' not in request.json:
         return jsonify({'error_message': 'image_url list attribute missing in json'}), 400
+    if 'isPremium' not in request.json:
+        return jsonify({'error_message': 'isPremium list attribute missing in json'}), 400
     
     username = request.json['username']
     description = request.json['description']
     languages = request.json['languages']
     hobbies = request.json['hobbies']
     image_url = request.json['image_url']
-
+    isPremium = request.json['isPremium']
+    update_premium(auth_id,isPremium)
     if len(languages) == 0 or any([l not in ['catalan', 'spanish', 'english'] for l in languages]):
         return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
 
@@ -127,6 +130,15 @@ def update_profile(id):
     profile['languages'] = [ str(l.language.value) for l in user_languages ]
 
     return jsonify(profile), 200
+
+def update_premium(id,isPremium):
+    pre_exp = premium_expiration.query.filter_by(user = id).first()
+    if pre_exp is None:
+        new_premium_expiration = premium_expiration(id,datetime.now()+ timedelta(days=365))
+        new_premium_expiration.save()
+    else:
+        pre_exp.delete()
+    
 
 @module_users_v1.route('/<id>/update_premium', methods=['POST'])
 @jwt_required(optional=False)
@@ -345,8 +357,8 @@ def register_viajuntos():
     viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
     # Increment achievement
     #todo
-    # if len(description) > 120:
-    #     increment_achievement_of_user('storyteller', user_id)
+    if len(description) > 120:
+        increment_achievement_of_user('storyteller', user_id)
     # increment_achievement_of_user('credential_multiverse', user_id)
     try:
         viajuntos_auth.save()
@@ -418,12 +430,82 @@ def register_google():
     # Increment achievement
     if len(description) > 120:
         increment_achievement_of_user('storyteller', user_id)
-    increment_achievement_of_user('credential_multiverse', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
         google_auth.save()
     except:
         return jsonify({'error_message': 'Something went wrong when adding auth method google to user'}), 500
+    
+    return generate_tokens(str(user_id)), 200
+
+@module_users_v1.route('/register/github', methods=['POST'])
+def register_github():
+    if 'token' not in request.json:
+        return jsonify({'error_message': 'Token attribute missing in json'}), 400 
+    if 'username' not in request.json:
+        return jsonify({'error_message': 'Username attribute missing in json'}), 400 
+    if 'description' not in request.json:
+        return jsonify({'error_message': 'Description attribute missing in json'}), 400 
+    if 'languages' not in request.json:
+        return jsonify({'error_message': 'Languages list attribute missing in json'}), 400 
+    if 'hobbies' not in request.json:
+        return jsonify({'error_message': 'Hobbies list attribute missing in json'}), 400
+    
+    token = request.json['token']
+    username = request.json['username']
+    description = request.json['description']
+    languages = request.json['languages']
+    hobbies = request.json['hobbies']
+    
+    if len(languages) == 0 or any([l not in ['catalan', 'spanish', 'english'] for l in languages]):
+        return jsonify({'error_message': 'Languages must be a subset of the following: {catalan, spanish, english}'}), 400
+
+    # Get github email from token
+    try:
+        idinfo = requests.get(f'https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}')
+        #idinfo = id_token.verify_oauth2_token(token, requests.Request(), os.getenv('GOOGLE_CLIENT_ID'))
+        email = idinfo.json()['email']
+    except:
+        return jsonify({'error_message': 'Google token was invalid'}), 400
+    
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
+    
+    # Check no other user exists with that email
+    if user_id_for_email(email) != None:
+        return jsonify({'error_message': 'User with this email already exists'}), 400
+    
+    if (len(description) > 180):
+        return jsonify({'error_message': f'Description is too long. No more than 180 characters allowed.'}), 400
+
+    # Add user to bd
+    user_id = uuid.uuid4()
+    user = User(user_id, username, email, description, hobbies)
+    try:
+        user.save()
+    except:
+        return jsonify({'error_message': 'Something went wrong when creating new user in db'}), 500
+    
+    # Add languages to user 
+    for l in languages:
+        try:
+            UserLanguage(user_id, l).save()
+        except:
+            return jsonify({'error_message': f'An error occured when adding language {l} to new user.'}), 500
+    
+    # Add github auth method to user
+    github_auth = GithubAuth(user_id, token)
+
+    # Increment achievement
+    if len(description) > 120:
+        increment_achievement_of_user('storyteller', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
+
+    try:
+        github_auth.save()
+    except:
+        return jsonify({'error_message': 'Something went wrong when adding auth method github to user'}), 500
     
     return generate_tokens(str(user_id)), 200
 
@@ -487,7 +569,7 @@ def register_facebook():
     # Increment achievement
     if len(description) > 120:
         increment_achievement_of_user('storyteller', user_id)
-    increment_achievement_of_user('credential_multiverse', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
         facebook_auth.save()
@@ -612,6 +694,31 @@ def login_google():
     google_auth.save()
     return generate_tokens(str(user.id)), 200
 
+@module_users_v1.route('/login/github', methods=['POST'])
+def login_github():
+    if 'token' not in request.json:
+        return jsonify({'error_message': 'Missing credentials in json body.'}), 400 
+    token = request.json['token']
+    # Get github email from token
+    try:
+        idinfo = requests.get(f'https://www.githubapis.com/oauth2/v3/userinfo?access_token={token}')
+        #idinfo = id_token.verify_oauth2_token(token, requests.Request(), os.getenv('GITHUB_CLIENT_ID'))
+        email = idinfo.json()['email']
+    except:
+        return jsonify({'error_message': 'Github token was invalid'}), 400
+    
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
+    user = User.query.filter_by(email = email).first()
+    if user == None:
+        return jsonify({'error_message': 'User does not exist'}), 400 
+    github_auth = GithubAuth.query.filter_by(id = user.id).first()
+    if github_auth == None:
+        return jsonify({'error_message': 'Authentication method not available for this email'}), 400
+    github_auth.access_token = token
+    github_auth.save()
+    return generate_tokens(str(user.id)), 200
+
 @module_users_v1.route('/login/facebook', methods=['POST'])
 def login_facebook():
     if 'token' not in request.json:
@@ -699,7 +806,7 @@ def link_viajuntos_auth_method(args):
     viajuntos_auth = ViajuntosAuth(user_id, user_salt, hashed_pw)
 
     # Increment achievement
-    increment_achievement_of_user('credential_multiverse', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
         viajuntos_auth.save()
@@ -738,7 +845,7 @@ def link_google_auth_method(args):
     google_auth = GoogleAuth(user_id, token)
 
     # Increment achievement
-    increment_achievement_of_user('credential_multiverse', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
         google_auth.save()
@@ -746,6 +853,43 @@ def link_google_auth_method(args):
         return jsonify({'error_message': 'Something went wrong when adding auth method google to user'}), 500
     
     return generate_tokens(str(user_id)), 200
+
+def link_github_auth_method(args):
+    if 'token' not in args:
+        return jsonify({'error_message': 'Github auth method must indicate token in credentials'}), 400
+    token = args['token']
+    # Get github email from token
+    try:
+        idinfo = requests.get(f'https://www.githubapis.com/oauth2/v3/userinfo?access_token={token}')
+        #idinfo = id_token.verify_oauth2_token(token, requests.Request(), os.getenv('GITHUB_CLIENT_ID'))
+        email = idinfo.json()['email']
+    except:
+        return jsonify({'error_message': 'Github token was invalid'}), 400
+    if BannedUsers.exists(email):
+        return jsonify({'error_message': 'This User is banned'}), 409
+    user_id = user_id_for_email(email)
+    # Check user exists
+    if user_id == None:
+        return jsonify({'error_message': 'User with this email does not exist, please register first'}), 400
+    
+    # Check user does not already have github auth enabled
+    github_auth = GithubAuth.query.filter_by(id = user_id).first()
+    if (github_auth != None):
+        return jsonify({'error_message': 'Github auth method already linked to this account'}), 400
+    
+    # Add github auth method to user
+    github_auth = GithubAuth(user_id, token)
+
+    # Increment achievement
+    # increment_achievement_of_user('credential_multiverse', user_id)
+
+    try:
+        github_auth.save()
+    except:
+        return jsonify({'error_message': 'Something went wrong when adding auth method github to user'}), 500
+    
+    return generate_tokens(str(user_id)), 200
+
 
 def link_facebook_auth_method(args):
     if 'token' not in args:
@@ -773,7 +917,7 @@ def link_facebook_auth_method(args):
     facebook_auth = FacebookAuth(user_id, token)
 
     # Increment achievement
-    increment_achievement_of_user('credential_multiverse', user_id)
+    # increment_achievement_of_user('credential_multiverse', user_id)
 
     try:
         facebook_auth.save()
@@ -843,6 +987,9 @@ def delete_account(id):
     f_auth = FacebookAuth.query.filter_by(id = user.id).first()
     if f_auth != None:
         f_auth.delete()
+    gh_auth = GithubAuth.query.filter_by(id = user.id).first()
+    if gh_auth != None:
+        gh_auth.delete()
     v_auth = ViajuntosAuth.query.filter_by(id = user.id).first()
     if v_auth != None:
         v_auth.delete()
@@ -864,9 +1011,13 @@ def delete_account(id):
     friends.extend(Friend.query.filter_by(invited = user.id).all())
     for f in friends:
         f.delete()
-    invites = FriendInvite.query.filter_by(invitee = user.id).all()
-    for i in invites:
-        i.delete()
+    invitees = FriendInvite.query.filter_by(invitee = user.id).all()
+    for invitee in invitees:
+        invitee.delete()
+    
+    inviteds = FriendInvite.query.filter_by(invited = user.id).all()
+    for invited in inviteds:
+        invited.delete()
     
     # Eliminar relación idiomas de usuario
     lang = UserLanguage.query.filter_by(user = user.id).all()
