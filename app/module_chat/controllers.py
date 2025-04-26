@@ -397,7 +397,14 @@ def get_user_chats(id):
             return jsonify({"error_message": "The user has no chats"}), 200
         chats_user = []
         for member in members_user:
-            chats_user.append(Chat.query.filter_by(id = member.chat_id).first())
+            chat_user = Chat.query.filter_by(id = member.chat_id).first()
+            if chat_user.type == "private":
+                Members_buscat = Members.query.filter_by(chat_id = chat_user.id)
+                for member in Members_buscat:
+                    if member.user_id != auth_id:
+                        user = User.query.filter_by(id = member.user_id).first()
+                        chat_user.name = user.username
+            chats_user.append(chat_user)
     except:
         return jsonify({"error_message": "Chat no exist"}), 400
 

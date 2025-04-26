@@ -2,7 +2,7 @@ from uuid import UUID
 from app import app
 import os,json, time, ipdb
 from flask import Flask, render_template
-from flask_socketio import SocketIO, join_room, send
+from flask_socketio import SocketIO, join_room, leave_room, rooms, send
 from datetime import datetime
 from flask_cors import CORS
 from app.module_chat.controllers import create_message_back
@@ -54,7 +54,12 @@ def handle_chat_message(data):
     msg = create_message_back(sender_id, chat_id, text)
     socketio.emit('ChatMessage', json.dumps(msg, default=default),to=chat_id)
     print("chat_id =", chat_id)
-
+    
+@socketio.on('disconnect')
+def disconnect():
+    print('Client disconnected')
+    for room in rooms():
+        leave_room(room)
 
 @socketio.on('join_room')
 def on_join(data):
