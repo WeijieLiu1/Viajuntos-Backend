@@ -9,8 +9,8 @@ RUN pip install -U pip wheel setuptools
 RUN pip install numpy==1.24.3
 RUN pip install google-api-python-client==2.49.0
 RUN pip install matplotlib==3.7.1
-
 RUN pip install -r /tmp/requirements.txt
+RUN pip install ipdb
 
 ENV AIRSERVICE_JOBS_SECRET_KEY="mykey"  
 ENV API_DEBUG="True"
