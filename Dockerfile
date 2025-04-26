@@ -35,12 +35,12 @@ COPY ./app /app
 COPY ./migrations /migrations
 COPY ./testEnvWin.ps1 /testEnvWin.ps1
 COPY ./testEnv.sh /testEnv.sh
-COPY ./docker-entrypoint.sh /docker-entrypoint.sh
+# COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 
 # Asegurarse de que el archivo de entrada tenga permisos de ejecución
-RUN apt-get update && apt-get install -y dos2unix
-RUN dos2unix /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# RUN apt-get update && apt-get install -y dos2unix
+# RUN dos2unix /docker-entrypoint.sh
+# RUN chmod +x /docker-entrypoint.sh
 
 COPY ./manage.py /manage.py 
 
@@ -48,4 +48,6 @@ COPY ./manage.py /manage.py
 RUN ./docker-entrypoint.sh
 
 WORKDIR /
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# ENTRYPOINT ["/docker-entrypoint.sh"]
+
+CMD ["python3", "wsgi.py"]
