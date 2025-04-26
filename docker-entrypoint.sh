@@ -2,7 +2,9 @@
 
 #cd /api
 
-python manage.py db migrate
-python manage.py db upgrade
+echo "📦 正在运行数据库迁移..."
+python3 manage.py db migrate || true
+python3 manage.py db upgrade || true
 
-echo should_have_upgraded_db
+echo "🚀 启动 Flask 应用..."
+exec python3 wsgi.py
