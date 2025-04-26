@@ -14,7 +14,7 @@ RUN pip install -r /tmp/requirements.txt
 
 ENV AIRSERVICE_JOBS_SECRET_KEY="mykey"  
 ENV API_DEBUG="True"
-ENV API_DOMAIN_NAME="https://viajuntos-backend-284495715917.europe-southwest1.run.app"  
+# ENV API_DOMAIN_NAME="https://viajuntos-backend-284495715917.europe-southwest1.run.app"  
 ENV API_PORT=8080  
 ENV API_SECRET_KEY="myapisecretkey"
 ENV DATABASE_URL="http://localhost:5432"   
