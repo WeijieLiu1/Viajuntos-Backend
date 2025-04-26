@@ -87,6 +87,8 @@ COPY ./manage.py /app/manage.py
 
 # 拷贝 shell 脚本，如果存在的话
 COPY ./docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
 COPY ./testEnvWin.ps1 /app/testEnvWin.ps1
 COPY ./testEnv.sh /app/testEnv.sh
 
@@ -95,4 +97,4 @@ RUN apt-get update && apt-get install -y dos2unix && \
     if [ -f /app/docker-entrypoint.sh ]; then dos2unix /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh; fi
 
 # 启动服务
-CMD ["python", "wsgi.py"]
+CMD ["python3", "wsgi.py"]
