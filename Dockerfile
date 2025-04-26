@@ -45,7 +45,7 @@ COPY ./testEnv.sh /testEnv.sh
 COPY ./manage.py /manage.py 
 
 # Ejecutar el script de entrada
-RUN ./docker-entrypoint.sh
+# RUN ./docker-entrypoint.sh
 
 WORKDIR /
 # ENTRYPOINT ["/docker-entrypoint.sh"]
