@@ -18,7 +18,7 @@ ENV API_DEBUG="True"
 ENV API_PORT=8080  
 ENV PORT=8080  
 ENV API_SECRET_KEY="myapisecretkey"
-ENV DATABASE_URL="http://localhost:5432"   
+ENV DATABASE_URL="http://34.173.188.139:5432"   
 ENV JWT_SECRET_KEY="myjwtkey" 
 ENV MAIL_PASSWORD="kdbbzkbkpemzfsrd"   
 ENV MAIL_USERNAME="zjqtlwj@gmail.com"
@@ -26,7 +26,7 @@ ENV POSTGRES_DB="viajuntosdb"
 ENV POSTGRES_PASSWORD="password123"
 ENV POSTGRES_PORT=5432
 ENV POSTGRES_USER="viajuntos" 
-ENV SQLALCHEMY_DATABASE_URI="postgresql://viajuntos:password123@localhost:5432/viajuntosdb"
+ENV SQLALCHEMY_DATABASE_URI="postgresql://viajuntos:password123@34.173.188.139:5432/viajuntosdb"
 
 # Copiar el código de nuestra app para que se pueda ejecutar
 COPY ./wsgi.py /wsgi.py

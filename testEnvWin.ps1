@@ -115,7 +115,6 @@ $env:SQLALCHEMY_DATABASE_URI = "postgresql://viajuntos:password123@localhost:543
 
 
 
-
 # export from local database
 # > pg_dump -U viajuntos -h localhost -p 5432 -d viajuntosdb -f viajuntosdb_20250422.sql
 # upload and copy to vm
