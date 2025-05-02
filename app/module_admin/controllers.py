@@ -83,7 +83,7 @@ def get_reported_events():
 # DEVUELVE:
 # - 400: Un objeto JSON con los posibles mensajes de error, id no valida o evento no existe
 # - 200: Un objeto JSON con los usuarios y, en cada uno, sus eventos reportados 
-# @jwt_required(optional=False)
+@jwt_required(optional=False)
 def get_reported_users():
     # auth_id = get_jwt_identity()
     # if not Admin.exists(auth_id):

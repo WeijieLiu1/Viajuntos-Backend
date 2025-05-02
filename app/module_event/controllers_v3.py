@@ -1359,7 +1359,7 @@ def add_payment():
     if "amount" not in request.json:
         return jsonify({"error_message": "the amount of the payment isn't in the URL as a query parameter with name eventid :("}), 400
     else:
-        amount =  request.json['amount']
+        amount = float(request.json['amount'])
         if(event.amount_event != amount):
             return jsonify({"error_message": f"Amount paid is not the same as the event amount"}), 400
         
