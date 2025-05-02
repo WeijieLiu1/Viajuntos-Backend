@@ -92,10 +92,14 @@ def get_reported_users():
     if BannedUsers.exists_user(auth_id):
             return jsonify({'error_message': 'This email is banned'}), 409
     reported_users = ReportedUser.query.all()
+
     reported_user_ids = {ru.id_user_reported for ru in reported_users}
-    
     reported_users_data = User.query.filter(User.id.in_(reported_user_ids)).all()
-    user_map = {user.id: user for user in reported_users_data}
+    user_reported_map = {user.id: user for user in reported_users_data}
+
+    reported_by_user_ids = {ru.id_user_reported for ru in reported_users}
+    reported_by_users_data = User.query.filter(User.id.in_(reported_by_user_ids)).all()
+    user_reported_by_map = {user.id: user for user in reported_by_users_data}
 
     banned_users = BannedUsers.query.all()
     banned_user_ids = {bu.id_user for bu in banned_users}
@@ -103,11 +107,14 @@ def get_reported_users():
     for reported_user in reported_users:
             if reported_user.id_user_reported in banned_user_ids:
                 continue
-            user = user_map.get(reported_user.id_user_reported)
-            if user:
+            user_reported = user_reported_map.get(reported_user.id_user_reported)
+            
+            user_reported_by = user_reported_by_map.get(reported_user.id_user)
+            if user_reported:
                 user_data = {
-                    'id_user': str(reported_user.id_user),
-                    'id_user_reported': user.toJSON(),
+                    'reported_by': str(user_reported_by.id),
+                    'reported_by_name': str(user_reported_by.username),
+                    'user_reported': user_reported.toJSON(),
                     'comment': reported_user.comment
                 }
                 result.append(user_data)
