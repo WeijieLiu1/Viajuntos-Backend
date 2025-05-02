@@ -60,6 +60,10 @@ def get_reported_events():
     all_events = Event.query.filter(Event.id.in_(event_ids)).all()
     event_map = {event.id: event for event in all_events}
 
+    reported_by_user_ids = {ru.id_user for ru in reported_events}
+    reported_by_users_data = User.query.filter(User.id.in_(reported_by_user_ids)).all()
+    user_reported_by_map = {user.id: user for user in reported_by_users_data}
+
     banned_events = BannedEvents.query.all()
     
     banned_event_ids = {bu.event_id for bu in banned_events}
@@ -67,10 +71,14 @@ def get_reported_events():
     for reported_event in reported_events:
         event = event_map.get(reported_event.id_event_reported)
         
+        user_reported_by = user_reported_by_map.get(reported_event.id_user)
         if event.id in banned_event_ids:
             continue
         if event:
             event_data = {
+                'reported_by': str(user_reported_by.id),
+                'reported_by_image_url': str(user_reported_by.image_url),
+                'reported_by_name': str(user_reported_by.username),
                 'id_user': reported_event.id_user,
                 'event': event.toJSON(),
                 'comment': reported_event.comment
@@ -97,7 +105,7 @@ def get_reported_users():
     reported_users_data = User.query.filter(User.id.in_(reported_user_ids)).all()
     user_reported_map = {user.id: user for user in reported_users_data}
 
-    reported_by_user_ids = {ru.id_user_reported for ru in reported_users}
+    reported_by_user_ids = {ru.id_user for ru in reported_users}
     reported_by_users_data = User.query.filter(User.id.in_(reported_by_user_ids)).all()
     user_reported_by_map = {user.id: user for user in reported_by_users_data}
 
@@ -113,6 +121,7 @@ def get_reported_users():
             if user_reported:
                 user_data = {
                     'reported_by': str(user_reported_by.id),
+                    'reported_by_image_url': str(user_reported_by.image_url),
                     'reported_by_name': str(user_reported_by.username),
                     'user_reported': user_reported.toJSON(),
                     'comment': reported_user.comment
