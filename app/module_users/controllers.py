@@ -936,7 +936,7 @@ def delete_account(id):
         user_id = uuid.UUID(id)
     except:
         return jsonify({"error_message": "User_id isn't a valid UUID"}), 400
-    if BannedUsers.exists(email):
+    if BannedUsers.exists(user_id):
         return jsonify({'error_message': 'This User is banned'}), 409
     try:
         user = User.query.get(user_id)

@@ -53,7 +53,8 @@ def get_reported_events():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({"error_message": "Only administrators can access this resource."}), 400
-
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     reported_events = ReportedEvent.query.all()
     event_ids = [reported_event.id_event_reported for reported_event in reported_events]
     all_events = Event.query.filter(Event.id.in_(event_ids)).all()
@@ -85,10 +86,11 @@ def get_reported_events():
 # - 200: Un objeto JSON con los usuarios y, en cada uno, sus eventos reportados 
 @jwt_required(optional=False)
 def get_reported_users():
-    # auth_id = get_jwt_identity()
-    # if not Admin.exists(auth_id):
-    #     return jsonify({"error_message": "Only administrators can access this resource."}), 400
-
+    auth_id = get_jwt_identity()
+    if not Admin.exists(auth_id):
+        return jsonify({"error_message": "Only administrators can access this resource."}), 400
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     reported_users = ReportedUser.query.all()
     reported_user_ids = {ru.id_user_reported for ru in reported_users}
     
@@ -119,7 +121,8 @@ def get_banned_user():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
-    
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     banned_users = BannedUsers.query.order_by(desc(BannedUsers.date)).all()
     return jsonify([bu.toJSON() for bu in banned_users]), 200
 
@@ -129,6 +132,8 @@ def get_banned_event():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     banned_events = BannedEvents.query.order_by(desc(BannedEvents.date)).all()
     return jsonify([be.toJSON() for be in banned_events]), 200
 
@@ -138,6 +143,8 @@ def ban_user():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if not (request.json and 'id' in request.json):
         return jsonify({'error_message': 'Missing id in json body.'}), 400
 
@@ -174,6 +181,8 @@ def ban_event():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if not (request.json and 'id' in request.json):
         return jsonify({'error_message': 'Missing id in json body.'}), 400
     try:
@@ -219,6 +228,8 @@ def unban_user():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if not (request.json and 'email' in request.json):
         return jsonify({'error_message': 'Missing email in json body.'}), 400
     
@@ -250,6 +261,8 @@ def unban_event():
     auth_id = get_jwt_identity()
     if not Admin.exists(auth_id):
         return jsonify({'error_message': 'Only administrators can make this action.'}), 403
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     if not (request.json and 'event_id' in request.json):
         return jsonify({'error_message': 'Missing event_id in json body.'}), 400
 

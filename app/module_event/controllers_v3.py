@@ -1463,6 +1463,10 @@ def get_posts_without_parent(id):
 @module_event_v3.route('/<id>/post/', methods=['Post'])
 @jwt_required(optional=False)
 def post_a_post(id): 
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try: 
         try:
             event_id = uuid.UUID(id)

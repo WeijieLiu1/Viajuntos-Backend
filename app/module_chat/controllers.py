@@ -81,7 +81,7 @@ def crear_public_chat(chat_name, creator_id, chat_members):
 @module_chat_v1.route('/add_member', methods=['POST'])
 @jwt_required(optional=False)
 def add_member(id_chat,id_new_member):
-    
+    auth_id = uuid.UUID(get_jwt_identity())
     if BannedUsers.exists_user(auth_id):
             return jsonify({'error_message': 'This email is banned'}), 409
     try: 
@@ -94,10 +94,6 @@ def add_member(id_chat,id_new_member):
         return jsonify({"error_message": "New member Id is not defined or its value is null"}), 400
 
     Chat_buscado= Chat.query.filter_by(id = id_chat).first()
-    auth_id = uuid.UUID(get_jwt_identity())
-    
-    if BannedUsers.exists_user(auth_id):
-        return jsonify({'error_message': 'This email is banned'}), 409
     if Chat_buscado == None:
         return jsonify({'error_message': 'No such chat.'}), 404
     if Chat_buscado.type == "private":
@@ -153,6 +149,10 @@ def remove_all_member_back(id_chat):
 @module_chat_v1.route('/remove_member', methods=['POST'])
 @jwt_required(optional=False)
 def remove_member(id_chat,id_member):
+    
+    auth_id = uuid.UUID(get_jwt_identity())
+    if BannedUsers.exists_user(auth_id):
+            return jsonify({'error_message': 'This email is banned'}), 409
     try: 
         args = request.json
     except:
@@ -163,10 +163,6 @@ def remove_member(id_chat,id_member):
         return jsonify({"error_message": "Member Id is not defined or its value is null"}), 400
 
     Chat_buscado= Chat.query.filter_by(id = id_chat).first()
-    auth_id = uuid.UUID(get_jwt_identity())
-    
-    if BannedUsers.exists_user(auth_id):
-        return jsonify({'error_message': 'This email is banned'}), 409
     if Chat_buscado == None:
         return jsonify({'error_message': 'No such chat.'}), 404
     if Chat_buscado.type == "private":

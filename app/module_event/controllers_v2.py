@@ -35,6 +35,13 @@ module_event_v2 = Blueprint('event_v2', __name__, url_prefix='/v2/events')
 @module_event_v2.route('/', methods=['POST'])
 @jwt_required(optional=False)
 def create_event():
+  # restricion: solo puedes crear eventos para tu usuario (mirando Bearer Token)
+    auth_id = get_jwt_identity()
+    if str(user_creator) != auth_id:
+        return jsonify({"error_message": "Un usuario no puede crear un evento por otra persona"}), 400   
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
     try:
         args = request.json
     except:
@@ -52,13 +59,6 @@ def create_event():
     max_participants = int(args.get("max_participants"))
     user_creator = uuid.UUID(args.get("user_creator"))
 
-  # restricion: solo puedes crear eventos para tu usuario (mirando Bearer Token)
-    auth_id = get_jwt_identity()
-    if str(user_creator) != auth_id:
-        return jsonify({"error_message": "Un usuario no puede crear un evento por otra persona"}), 400   
-    
-    if BannedUsers.exists_user(auth_id):
-        return jsonify({'error_message': 'This email is banned'}), 409
     event = Event(event_uuid, args.get("name"), args.get("description"), date_started, date_end, user_creator, longitud, latitude, max_participants, args.get("event_image_uri"))
     
     # Errores al guardar en la base de datos: FK violated, etc
@@ -93,6 +93,13 @@ def create_event():
 @module_event_v2.route('/<id>', methods=['PUT'])
 @jwt_required(optional=False)
 def modify_events_v2(id):
+    # restricion: solo el usuario creador puede modificar su evento (mirando Bearer Token)
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409
+    if str(event.user_creator) != auth_id:
+        return jsonify({"error_message": "A user cannot update the events of others"}), 400    
     try:
         event_id = uuid.UUID(id)
     except:
@@ -121,14 +128,7 @@ def modify_events_v2(id):
     # restricion: solo el usuario creador puede editar su evento
     if event.user_creator != uuid.UUID(args.get("user_creator")):
         return jsonify({"error_message": "solo el usuario creador puede modificar su evento"}), 400
-
-    # restricion: solo el usuario creador puede modificar su evento (mirando Bearer Token)
-    auth_id = get_jwt_identity()
-    
-    if BannedUsers.exists_user(auth_id):
-        return jsonify({'error_message': 'This email is banned'}), 409
-    if str(event.user_creator) != auth_id:
-        return jsonify({"error_message": "A user cannot update the events of others"}), 400       
+   
 
     event.name = args.get("name")
     event.description = args.get("description")
@@ -278,6 +278,10 @@ def check_atributes(args):
 @module_event_v2.route('/<id>/join', methods=['POST'])
 @jwt_required(optional=False)
 def join_event(id):
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try:
         event_id = uuid.UUID(id)
     except:
@@ -438,6 +442,10 @@ def get_user_joins(id):
 # - 201: Un objeto JSON con TODOS los parametros del evento con la id de la request
 @jwt_required(optional=False)
 def get_event(id):
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try:
         event_id = uuid.UUID(id)
     except:
@@ -575,6 +583,10 @@ def get_all_events():
 @module_event_v2.route('/filter', methods=['GET'])
 @jwt_required(optional=False)
 def filter_by():
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try:
         args = request.json
     except:
@@ -618,6 +630,10 @@ def filter_by():
 @module_event_v2.route('/lastten', methods=['GET'])
 @jwt_required(optional=False)
 def lastest_events():
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try:
         lasts_events = Event.query.order_by(Event.date_creation.desc()).all()
     except:
@@ -639,6 +655,10 @@ def lastest_events():
 @module_event_v2.route('/participants', methods=['GET'])
 @jwt_required(optional=False)
 def who_joined_event():
+    auth_id = get_jwt_identity()
+    
+    if BannedUsers.exists_user(auth_id):
+        return jsonify({'error_message': 'This email is banned'}), 409 
     try:
         args = request.args
     except:
